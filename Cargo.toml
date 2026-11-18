@@ -8,8 +8,8 @@ members = [
     "platforms/web",
     # "platforms/mobile", (você pode ativar depois)
 ]
-exclude = ["crates/tetanes-core"]
+exclude = ["crates/tetanes-core/tetanes-core"]
 resolver = "2"
 
 [patch.crates-io]
-tetanes-core = { path = "crates/tetanes-core" }
+tetanes-core = { path = "crates/tetanes-core/tetanes-core" }
