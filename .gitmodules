@@ -1,0 +1,15 @@
+[submodule "crates/emmu-core"]
+	path = crates/emmu-core
+	url = https://github.com/EspetoRx/emmu-core.git
+[submodule "crates/emmu-frontend"]
+	path = crates/emmu-frontend
+	url = https://github.com/EspetoRx/emmu-frontend.git
+[submodule "crates/emmu-nes"]
+	path = crates/emmu-nes
+	url = https://github.com/EspetoRx/emmu-nes.git
+[submodule "crates/emmu-snes"]
+	path = crates/emmu-snes
+	url = https://github.com/EspetoRx/emmu-snes.git
+[submodule "crates/tetanes-core"]
+	path = crates/tetanes-core
+	url = https://github.com/EspetoRx/tetanes-core.git

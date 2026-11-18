@@ -1,0 +1,15 @@
+[workspace]
+members = [
+    "crates/emmu-core",
+    "crates/emmu-nes",
+    "crates/emmu-snes",
+    "crates/emmu-frontend",
+    "platforms/desktop",
+    "platforms/web",
+    # "platforms/mobile", (você pode ativar depois)
+]
+exclude = ["crates/tetanes-core"]
+resolver = "2"
+
+[patch.crates-io]
+tetanes-core = { path = "crates/tetanes-core" }
