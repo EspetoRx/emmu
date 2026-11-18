@@ -13,3 +13,9 @@
 [submodule "crates/tetanes-core"]
 	path = crates/tetanes-core
 	url = https://github.com/EspetoRx/tetanes-core.git
+[submodule "emmu-desktop"]
+	path = platforms/desktop
+	url = https://github.com/EspetoRx/emmu-desktop.git
+[submodule "emmu-web"]
+	path = platforms/web
+	url = https://github.com/EspetoRx/emmu-web.git
