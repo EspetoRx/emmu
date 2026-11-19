@@ -19,3 +19,6 @@
 [submodule "emmu-web"]
 	path = platforms/web
 	url = https://github.com/EspetoRx/emmu-web.git
+[submodule "crates/emmu-super-sabicom"]
+	path = crates/emmu-super-sabicom
+	url = https://github.com/EspetoRx/emmu-super-sabicom.git
