@@ -25,6 +25,6 @@
 [submodule "crates/emmu-mesen-sys"]
 	path = crates/emmu-mesen-sys
 	url = https://github.com/EspetoRx/emmu-mesen-sys.git
-[submodule "crates/emmu-gba/vendor/web-gba-emulator"]
-	path = crates/emmu-gba/vendor/web-gba-emulator
-	url = https://github.com/alexcerezo/Web-GBA-Emulator.git
+[submodule "crates/emmu-gba"]
+	path = crates/emmu-gba
+	url = https://github.com/EspetoRx/emmu-gba.git
