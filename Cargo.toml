@@ -9,7 +9,11 @@ members = [
     "platforms/web",
     # "platforms/mobile", (você pode ativar depois)
 ]
-exclude = ["crates/tetanes-core"]
+# `emmu-super-sabicom` é um submodule usado apenas como dependência normal do
+# `emmu-snes`. Mantê-lo fora do workspace evita que o Cargo (e o rust-analyzer)
+# compile os dev-dependencies dele — em especial `compress-tools`, cujo build
+# script exige a biblioteca nativa `libarchive` (que não é necessária em runtime).
+exclude = ["crates/tetanes-core", "crates/emmu-super-sabicom"]
 resolver = "2"
 
 [patch.crates-io]
