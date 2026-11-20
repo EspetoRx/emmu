@@ -3,6 +3,7 @@ members = [
     "crates/emmu-core",
     "crates/emmu-nes",
     "crates/emmu-snes",
+    "crates/emmu-gba",
     "crates/emmu-frontend",
     "crates/emmu-mesen-sys",
     "platforms/desktop",

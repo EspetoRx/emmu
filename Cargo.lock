@@ -865,6 +865,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "emmu-gba"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "emmu-mesen-sys"
 version = "0.1.0"
 
