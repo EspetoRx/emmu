@@ -5,11 +5,22 @@
       "label": "Emmu: web dev server",
       "type": "shell",
       "command": "${workspaceFolder}/.vscode/web-dev-server.sh",
-      "presentation": {
-        "reveal": "silent",
-        "panel": "dedicated"
-      },
-      "problemMatcher": []
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "emmu-web",
+        "fileLocation": ["relative", "${workspaceFolder}/platforms/web/ui"],
+        "pattern": {
+          "regexp": "^__EMMU_NO_PROBLEMS__:(\\d+):(\\d+): (.*)$",
+          "line": 1,
+          "column": 2,
+          "message": 3
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^(> emmu-ui@.* dev|VITE v)",
+          "endsPattern": "(Local:.*127\\.0\\.0\\.1:5173|Emmu: servidor web já ativo)"
+        }
+      }
     },
     {
       "label": "Emmu: build UI",
@@ -30,21 +41,17 @@
       "label": "Emmu: cargo build desktop",
       "type": "process",
       "command": "cargo",
-      "args": ["build", "-p", "desktop"],
+      "args": [
+        "build",
+        "-p",
+        "desktop"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
-      "problemMatcher": ["$rustc"]
-    },
-    {
-      "label": "Emmu: build desktop",
-      "dependsOrder": "sequence",
-      "dependsOn": ["Emmu: build UI", "Emmu: cargo build desktop"],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "problemMatcher": []
+      "problemMatcher": [
+        "$rustc"
+      ]
     }
   ]
 }
