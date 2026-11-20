@@ -3,11 +3,10 @@
   "configurations": [
     {
       "name": "Emmu: Web (Chrome)",
-      "type": "pwa-chrome",
+      "type": "chrome",
       "request": "launch",
-      // Atualizar a versão do Chromium após `npx playwright install chromium`.
-      // A versão instalada aparece em ~/Library/Caches/ms-playwright/.
-      "runtimeExecutable": "${env:HOME}/Library/Caches/ms-playwright/chromium-1255/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+      // Resolve automaticamente a versão instalada pelo Playwright.
+      "runtimeExecutable": "${workspaceFolder}/.vscode/chrome-for-testing.sh",
       "url": "http://127.0.0.1:5173",
       "webRoot": "${workspaceFolder}/platforms/web/ui",
       "preLaunchTask": "Emmu: web dev server"
