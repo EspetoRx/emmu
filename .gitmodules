@@ -22,3 +22,6 @@
 [submodule "crates/emmu-super-sabicom"]
 	path = crates/emmu-super-sabicom
 	url = https://github.com/EspetoRx/emmu-super-sabicom.git
+[submodule "crates/emmu-mesen-sys"]
+	path = crates/emmu-mesen-sys
+	url = https://github.com/EspetoRx/emmu-mesen-sys.git

@@ -807,9 +807,7 @@ version = "0.1.0"
 dependencies = [
  "emmu-core",
  "emmu-frontend",
- "emmu-mesen-sys",
  "emmu-nes",
- "serde",
  "tauri",
  "tauri-build",
 ]
