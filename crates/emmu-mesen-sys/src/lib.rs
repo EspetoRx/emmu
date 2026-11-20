@@ -91,6 +91,8 @@ extern "C" {
     pub fn GetNesConfig() -> NesConfigAbi;
     pub fn SetNesConfig(config: NesConfigAbi);
     pub fn SetAudioConfig(config: AudioConfigAbi);
+    pub fn SaveStateFile(filepath: *mut c_char);
+    pub fn LoadStateFile(filepath: *mut c_char);
     pub fn InitDll();
     pub fn InitializeEmu(
         homeFolder: *const c_char,
@@ -218,10 +220,11 @@ pub fn connect_nes_controllers() {
 /// `SetAudioDevice(cfg.AudioDevice)` a cada frame, e um ponteiro nulo causa
 /// `strlen(nullptr)` (SIGSEGV) na thread de emulação.
 pub fn configure_audio() {
-    if is_shutting_down() {
-        return;
-    }
+    set_audio_volume(100);
+    eprintln!("[emmu-mesen-sys] AudioConfig ajustado para dispositivo padrão");
+}
 
+fn audio_config(volume: u32) -> AudioConfigAbi {
     let mut config = AudioConfigAbi {
         bytes: [0; AUDIO_CONFIG_SIZE],
     };
@@ -230,14 +233,39 @@ pub fn configure_audio() {
         .copy_from_slice(&(DEFAULT_AUDIO_DEVICE.as_ptr() as usize).to_le_bytes());
     config.bytes[AUDIO_ENABLE_OFFSET] = 1;
     config.bytes[AUDIO_MASTER_VOLUME_OFFSET..AUDIO_MASTER_VOLUME_OFFSET + 4]
-        .copy_from_slice(&100u32.to_le_bytes());
+        .copy_from_slice(&volume.min(100).to_le_bytes());
     config.bytes[AUDIO_SAMPLE_RATE_OFFSET..AUDIO_SAMPLE_RATE_OFFSET + 4]
         .copy_from_slice(&48000u32.to_le_bytes());
     config.bytes[AUDIO_LATENCY_OFFSET..AUDIO_LATENCY_OFFSET + 4]
         .copy_from_slice(&60u32.to_le_bytes());
+    config
+}
 
-    unsafe { SetAudioConfig(config) };
-    eprintln!("[emmu-mesen-sys] AudioConfig ajustado para dispositivo padrão");
+/// Ajusta o volume de saída do Mesen (0-100). Não há `GetAudioConfig` na ABI,
+/// então reconstruímos a config com os mesmos valores de `configure_audio()`.
+pub fn set_audio_volume(volume: u32) {
+    if is_shutting_down() {
+        return;
+    }
+    unsafe { SetAudioConfig(audio_config(volume)) };
+}
+
+pub fn save_state_to_file(path: &str) -> Result<(), std::ffi::NulError> {
+    if is_shutting_down() {
+        return Ok(());
+    }
+    let path = CString::new(path)?;
+    unsafe { SaveStateFile(path.as_ptr() as *mut c_char) };
+    Ok(())
+}
+
+pub fn load_state_from_file(path: &str) -> Result<(), std::ffi::NulError> {
+    if is_shutting_down() {
+        return Ok(());
+    }
+    let path = CString::new(path)?;
+    unsafe { LoadStateFile(path.as_ptr() as *mut c_char) };
+    Ok(())
 }
 
 pub fn set_input_overrides(index: u32, state: DebugControllerState) {
