@@ -19,8 +19,12 @@
       "cwd": "${workspaceFolder}/platforms/desktop",
       "env": {
         "RUST_BACKTRACE": "1",
-        "RUST_LOG": "info"
+        "RUST_LOG": "info",
+        "DYLD_LIBRARY_PATH": "/tmp/MesenCE/InteropDLL/obj.osx-arm64"
       },
+      // O AudioToolbox (SDL) lança exceções C++ internas ao trocar o device de
+      // áudio. O CodeLLDB persiste "C++: on throw" entre sessões e pausa nelas.
+      "preRunCommands": ["breakpoint name configure --disable cpp_exception"],
       "preLaunchTask": "Emmu: build desktop"
     }
   ]

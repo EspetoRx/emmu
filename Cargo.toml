@@ -4,6 +4,7 @@ members = [
     "crates/emmu-nes",
     "crates/emmu-snes",
     "crates/emmu-frontend",
+    "crates/emmu-mesen-sys",
     "platforms/desktop",
     "platforms/web",
     # "platforms/mobile", (você pode ativar depois)

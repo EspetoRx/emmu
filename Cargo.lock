@@ -807,7 +807,9 @@ version = "0.1.0"
 dependencies = [
  "emmu-core",
  "emmu-frontend",
+ "emmu-mesen-sys",
  "emmu-nes",
+ "serde",
  "tauri",
  "tauri-build",
 ]
@@ -1043,6 +1045,10 @@ version = "0.1.0"
 dependencies = [
  "emmu-core",
 ]
+
+[[package]]
+name = "emmu-mesen-sys"
+version = "0.1.0"
 
 [[package]]
 name = "emmu-nes"
