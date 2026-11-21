@@ -31,3 +31,6 @@
 [submodule "crates/emmu-gbc"]
 	path = crates/emmu-gbc
 	url = https://github.com/EspetoRx/emmu-gbc.git
+[submodule "crates/emmu-gb"]
+	path = crates/emmu-gb
+	url = https://github.com/EspetoRx/emmu-gb.git
