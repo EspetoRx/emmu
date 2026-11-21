@@ -40,3 +40,6 @@
 [submodule "crates/emmu-gg"]
 	path = crates/emmu-gg
 	url = https://github.com/EspetoRx/emmu-gg.git
+[submodule "crates/emmu-ws"]
+	path = crates/emmu-ws
+	url = https://github.com/EspetoRx/emmu-ws.git

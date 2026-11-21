@@ -7,6 +7,7 @@ members = [
     "crates/emmu-gbc",
     "crates/emmu-gb",
     "crates/emmu-gg",
+    "crates/emmu-ws",
     "crates/emmu-pce",
     "crates/emmu-frontend",
     "crates/emmu-mesen-sys",
@@ -23,6 +24,7 @@ exclude = [
     "crates/emmu-super-sabicom",
     "crates/emmu-pce/vendor",
     "crates/emmu-gg/vendor",
+    "crates/emmu-ws/vendor",
 ]
 resolver = "2"
 

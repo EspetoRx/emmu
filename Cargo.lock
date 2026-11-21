@@ -1102,6 +1102,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "emmu-ws"
+version = "0.1.0"
+dependencies = [
+ "bincode 2.0.1",
+ "getrandom 0.4.3",
+ "swanium-core",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3864,6 +3874,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "swanium-core"
+version = "1.0.1"
+dependencies = [
+ "bincode 2.0.1",
+ "serde",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

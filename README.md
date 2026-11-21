@@ -47,11 +47,13 @@ A mesma UI atende web e desktop. A troca de backend acontece em `createEmulator(
 | Game Boy | `.gb` | `emmu-gb` → oxGBC (`Dmg`) | MesenCE (`Gameboy`) | `EMMUGMB1` / `.mss` |
 | Game Boy Color | `.gbc` | `emmu-gbc` → oxGBC (`Cgb`) | MesenCE (`AutoFavorGbc`) | `EMMUGBC1` / `.mss` |
 | Sega Game Gear | `.gg` | `emmu-gg` → JGenesis `smsgg-core` | MesenCE (`GameGear`) | `EMMUGG01` / `.mss` |
+| WonderSwan / WonderSwan Color | `.ws`, `.wsc` | `emmu-ws` → Swanium | MesenCE (`Auto` Mono/Color) | `EMMUWS01` / `.mss` |
 | PC Engine / TurboGrafx-16 | `.pce` | `emmu-pce` → JGenesis `pce-core` | MesenCE (`TurboGrafx`) | `EMMUPCE1` / `.mss` |
 
 Detalhes importantes:
 
 - **Game Gear** usa os botões 1/2 (mapeados de A/B) e Start; não há Select, P2, X/Y ou L/R. ROMs `.gg` também podem ser importadas dentro de um `.zip`.
+- **WonderSwan** tem dois direcionais de 4 vias: setas controlam o primeiro; S/A/Q/W (ou X/Y/L/R nos bindings) controlam o segundo. Z/X são A/B e Enter é Start. Não há Select nem P2. `.ws` e `.wsc` usam o mesmo core e também podem vir de um `.zip`.
 - **PC Engine** usa HuCard (`.pce`); não há suporte a jogos de CD-ROM.
 - O PCE web usa gamepad de **2 botões** (I/II). O modo 6 botões alternava o estado extra em cada transição de `CLR` e fazia as setas pararem de responder em vários jogos.
 - O PCE web gera frames RGBA8888 de **282×242**; o desktop/Mesen publica **256×242**.
@@ -63,7 +65,7 @@ Detalhes importantes:
 
 ## Recursos
 
-- **Biblioteca persistente:** ROMs são guardadas como blobs no IndexedDB; a abertura aceita vários arquivos de uma vez, incluindo `.zip` com ROMs `.gg`. Se uma entrada antiga perder o blob, basta reimportar a mesma ROM.
+- **Biblioteca persistente:** ROMs são guardadas como blobs no IndexedDB; a abertura aceita vários arquivos de uma vez, incluindo `.zip` com ROMs `.gg`, `.ws` e `.wsc`. Se uma entrada antiga perder o blob, basta reimportar a mesma ROM.
 - **Overlay de carregamento:** mostra progresso real (`x de y jogos`), barra e porcentagem enquanto o IndexedDB é percorrido com cursor.
 - **Save states:** checkpoint automático a cada 5 segundos, ao voltar para a biblioteca, ao background e ao desmontar o player. Save manual entra no histórico; os 10 estados anteriores ficam disponíveis em **Histórico**.
 - **Recuperação:** estado corrompido oferece reinício limpo ou retorno à biblioteca para escolher outro save.
@@ -106,7 +108,7 @@ Vue UI
        └─ emmu-frame://localhost/frame?n=<nonce>  →  frames BMP gerados no Rust
 ```
 
-O Mesen é inicializado em modo headless. Os frames chegam pelas notificações `PPU_FRAME_DONE` (NES) e `REFRESH_SOFTWARE_RENDERER` (SNES/GBA/GB/GBC/GG/PCE). Save states são gravados em arquivos `.mss` temporários e devolvidos à UI como bytes para o IndexedDB.
+O Mesen é inicializado em modo headless. Os frames chegam pelas notificações `PPU_FRAME_DONE` (NES) e `REFRESH_SOFTWARE_RENDERER` (SNES/GBA/GB/GBC/GG/WS/PCE). Save states são gravados em arquivos `.mss` temporários e devolvidos à UI como bytes para o IndexedDB.
 
 ### Persistência
 
@@ -137,6 +139,8 @@ emmu/
 │   ├── emmu-gb/                    # core Game Boy DMG via oxGBC
 │   ├── emmu-gg/                    # core Sega Game Gear via JGenesis smsgg-core
 │   │   └── vendor/jgenesis/        # subset SMS/GG vendorizado (GPL-3.0-only)
+│   ├── emmu-ws/                    # core WonderSwan via Swanium
+│   │   └── vendor/swanian-core/    # subset do core Swanium vendorizado (MIT)
 │   ├── emmu-pce/                   # core PC Engine via JGenesis pce-core
 │   ├── emmu-mesen-sys/             # FFI da ABI do MesenCE + runtime SDL2/BIOS
 │   ├── emmu-super-sabicom/         # core SNES upstream (MIT)
@@ -341,7 +345,7 @@ cargo fmt --all -- --check
 cargo check --workspace
 
 # Testes dos núcleos e do desktop
-cargo test -p emmu-gg -p emmu-pce -p emmu-gb -p emmu-gbc -p emmu-mesen-sys -p desktop
+cargo test -p emmu-gg -p emmu-ws -p emmu-pce -p emmu-gb -p emmu-gbc -p emmu-mesen-sys -p desktop
 
 # Testes com ROM real (opcionais)
 EMMU_NES_TEST_ROM="/caminho/jogo.nes" cargo test -p emmu-nes
@@ -349,9 +353,11 @@ EMMU_GBC_TEST_ROM="/caminho/jogo.gbc" cargo test -p emmu-gbc
 EMMU_GB_TEST_ROM="/caminho/jogo.gb" cargo test -p emmu-gb
 EMMU_PCE_TEST_ROM="/caminho/jogo.pce" cargo test -p emmu-pce
 EMMU_GG_TEST_ROM="/caminho/jogo.gg" cargo test -p emmu-gg
+EMMU_WS_TEST_ROM="/caminho/jogo.ws" cargo test -p emmu-ws
 MESEN_TEST_ROM="/caminho/jogo.nes" cargo test -p emmu-mesen-sys
 MESEN_PCE_TEST_ROM="/caminho/jogo.pce" cargo test -p emmu-mesen-sys
 MESEN_GG_TEST_ROM="/caminho/jogo.gg" cargo test -p emmu-mesen-sys
+MESEN_WS_TEST_ROM="/caminho/jogo.ws" cargo test -p emmu-mesen-sys
 ```
 
 `cargo test -p emmu-mesen-sys` e `-p desktop` exigem que `MesenCore` esteja linkável (runtime preparado ou `MESEN_LIB_DIR`).
@@ -376,6 +382,7 @@ cargo run -p emmu-snes --example snes_smoke -- Jogo.sfc
 | `crates/emmu-gbc` | `EspetoRx/emmu-gbc` @ `da3763c` | core GBC | GPL-3.0-only |
 | `crates/emmu-gb` | `EspetoRx/emmu-gb` @ `5150825` | core GB DMG | GPL-3.0-only |
 | `crates/emmu-gg` | `EspetoRx/emmu-gg` @ `081ee8e` | core Sega Game Gear | GPL-3.0-only |
+| `crates/emmu-ws` | diretório local (ainda sem submódulo/remote) | core WonderSwan via Swanium | MIT |
 | `crates/emmu-pce` | `EspetoRx/emmu-pce` @ `e8a9860` | core PC Engine | GPL-3.0-only |
 | `crates/emmu-mesen-sys` | `EspetoRx/emmu-mesen-sys` @ `46dab68` | FFI Mesen + runtime | sem campo declarado |
 | `crates/emmu-super-sabicom` | `EspetoRx/emmu-super-sabicom` @ `a7b80ad` | core SNES | MIT |
@@ -386,6 +393,7 @@ cargo run -p emmu-snes --example snes_smoke -- Jogo.sfc
 | `crates/emmu-mesen-sys/vendor/SDL` | `libsdl-org/SDL` @ `release-2.32.10` | áudio dlopen no desktop | zlib |
 | `crates/emmu-pce/vendor/jgenesis` | código vendorizado (não submodule) @ `8d1bdfb` | `pce-core` | GPL-3.0-only |
 | `crates/emmu-gg/vendor/jgenesis` | código vendorizado (não submodule) @ `8d1bdfb` | `smsgg-core` (subset GG) | GPL-3.0-only |
+| `crates/emmu-ws/vendor/swanian-core` | código vendorizado @ `021d61d` | core WonderSwan Swanium | MIT |
 
 ---
 
@@ -401,6 +409,7 @@ Este projeto combina código próprio e software de terceiros. Respeite cada lic
 | `emmu-gb`, `emmu-gbc` | GPL-3.0-only | texto GPLv3 em `LICENSE`; código em `vendor/oxgbc-core` |
 | oxGBC | GPL-3.0-only | `mxmgorin/oxgbc`, commit `b95ff230...`; autor `troidem <mxmgorin@gmail.com>` |
 | `emmu-gg` e JGenesis `smsgg-core` | GPL-3.0-only | `jsgroth/jgenesis`, commit `8d1bdfba...`; subset SMS/GG com hardware forçado para Game Gear |
+| `emmu-ws` e Swanium | MIT | `bubio/Swanium` @ `021d61d`; `Copyright (c) 2026 bubio`; subset `crates/core` vendorizado |
 | `emmu-pce` e JGenesis `pce-core` | GPL-3.0-only | `jsgroth/jgenesis`, commit `8d1bdfba...`; subset HuCard |
 | Web-GBA / gbajs | BSD-2-Clause | `Copyright (c) 2012, Jeffrey Pfau`; adaptação web por `alexcerezo` |
 | MesenCE / Mesen 2 | GPL-3.0 | `Copyright (C) 2014-2025 Sour`; binário externo, distribuído via `runtime/` |
@@ -430,6 +439,9 @@ crates/emmu-gb/vendor/oxgbc-core/UPSTREAM.txt
 crates/emmu-gg/LICENSE
 crates/emmu-gg/UPSTREAM.txt
 crates/emmu-gg/vendor/jgenesis/LICENSE
+crates/emmu-ws/LICENSE
+crates/emmu-ws/UPSTREAM.txt
+crates/emmu-ws/vendor/swanian-core/LICENSE
 crates/emmu-pce/LICENSE
 crates/emmu-pce/UPSTREAM.txt
 crates/emmu-pce/vendor/jgenesis/LICENSE
@@ -466,6 +478,8 @@ crates/emmu-mesen-sys/runtime/LICENSE-SDL2.txt   # gerado pelo script
 | Desktop sem áudio | SDL2 não encontrado pelo `dlopen` | rode `scripts/build-sdl2.sh` e reinicie o app |
 | Tela PCE preta no desktop | paleta padrão ausente | confirme `src/pce_palette.rs` em `emmu-mesen-sys` |
 | Setas do PCE travadas no menu | gamepad 6 botões | use `PceInputDevice::TwoButtonGamepad` (já é o padrão) |
+| WS lento ou com áudio desafinado | `runFrame` chamado a 60 Hz contra um hardware de ~75 Hz | confirme o acumulador de ciclos em `crates/emmu-ws/src/lib.rs` |
+| Segundo direcional do WS não responde | binding errado | use S/A/Q/W (X/Y/L/R nos bindings) ou o pad na tela; no desktop, U/D/L/R da ABI do Mesen |
 | Botão “cola” após soltar | evento sem `code` ou janela sem foco | `useShortcuts.js` tem fallback para `event.key` e libera tudo no `blur` |
 | Miniatura não salva no desktop | canvas tainted por `emmu-frame://` | use `mesen_capture_preview()` (PNG gerado no Rust) |
 | `EXC_BAD_ACCESS` ao sair | chamada FFI após `Release()` | mantenha o guard de shutdown de `emmu-mesen-sys` |

@@ -22,16 +22,16 @@ Se não souber a resposta, pergunte ao usuário **qual ROM, qual plataforma e qu
 | Item | Fato |
 | --- | --- |
 | UI | Vue 3 + Vite 6 em `platforms/web/ui`, compartilhada por web, Tauri desktop e scripts mobile |
-| Web | Web Worker (`snes.worker.js`) + sete pacotes WASM gerados por `wasm-pack` |
+| Web | Web Worker (`snes.worker.js`) + oito pacotes WASM gerados por `wasm-pack` |
 | Desktop | Tauri 2 + Rust; emulação via MesenCE (`emmu-mesen-sys`), não via WASM |
-| Consoles | NES, SNES, GBA, GB, GBC, GG, PCE |
+| Consoles | NES, SNES, GBA, GB, GBC, GG, WS/WSC, PCE |
 | Persistência | IndexedDB `emmu-library` v2; `localStorage` para filtros e controles |
-| Save states | `EMMUGMB1`, `EMMUGBC1`, `EMMUGG01`, `EMMUPCE1`, `EMMUSAVE1`, bincode/TetaNES no web; `.mss` no desktop |
+| Save states | `EMMUGMB1`, `EMMUGBC1`, `EMMUGG01`, `EMMUWS01`, `EMMUPCE1`, `EMMUSAVE1`, bincode/TetaNES no web; `.mss` no desktop |
 | Frames web | RGBA8888 via `putImageData` |
 | Frames desktop | BMP 24-bit via protocolo `emmu-frame://`; miniatura via PNG gerado no Rust |
 | Cores GPL | GB, GBC, GG e PCE no web; Mesen no desktop |
-| Cores MIT/permisivos | NES, SNES, GBA no web |
-| Submódulos | Todos os crates e plataformas são submódulos Git, incluindo `crates/emmu-gg` (`EspetoRx/emmu-gg`) |
+| Cores MIT/permisivos | NES, SNES, GBA e WS (Swanium) no web |
+| Submódulos | Todos os crates e plataformas antigos são submódulos; `crates/emmu-ws` é diretório local até receber remote |
 | Push | `emmu-gg` foi publicado; os demais repositórios/commits continuam locais. Não faça push sem confirmar remotos |
 
 ---
@@ -61,6 +61,9 @@ Para entender o projeto rapidamente, nesta ordem:
 | Controle touch errado | `platforms/web/ui/src/components/Player.vue` | `useEmulator.js::setButton` |
 | GG sem áudio/vídeo no web | `crates/emmu-gg/src/lib.rs` (`default_config`) | `smsgg-core` em `vendor/jgenesis` |
 | GG com frame 256x240 no desktop | `crates/emmu-mesen-sys/src/lib.rs` (`SMS_GAME_GEAR_OVERSCAN`) | `platforms/desktop/src/lib.rs` (`mesen_init_rom`) |
+| WS lento/áudio desafinado no web | `crates/emmu-ws/src/lib.rs` (`cycle_carry`) | `swanium-core::system::CYCLES_PER_FRAME` |
+| Segundo direcional WS não responde | `useEmulator.js::coreButtonForFormat` | `Player.vue` / `ControlsDialog.vue` |
+| WS desktop com frame 224x157 ou sem áudio | `crates/emmu-mesen-sys/src/lib.rs` (`connect_ws_controllers`) | `platforms/desktop/src/lib.rs` (`mesen_init_rom`) |
 | Setas PCE travadas | `crates/emmu-pce/src/lib.rs` (`default_config`) | `input.rs` do vendor JGenesis |
 | PCE com tela preta no desktop | `crates/emmu-mesen-sys/src/pce_palette.rs` | `connect_pce_controllers` |
 | Sem imagem no desktop | `platforms/desktop/src/lib.rs` (`frame_as_bmp`, `emmu-frame`) | notificações do Mesen |
@@ -86,7 +89,7 @@ Não quebre estes contratos sem uma razão explícita e testes.
   - com Tauri → `MesenTauriClient`;
   - sem Tauri → `EmulationWorkerClient`.
 - No desktop, **todos** os consoles usam Mesen. Nenhum WASM é usado no desktop.
-- No web, NES/SNES/GBA/GB/GBC/GG/PCE usam cores separados, todos via Worker.
+- No web, NES/SNES/GBA/GB/GBC/GG/WS/PCE usam cores separados, todos via Worker.
 
 ### 4.2 Extensões e formatos
 
@@ -94,13 +97,15 @@ Não quebre estes contratos sem uma razão explícita e testes.
 .gb   → GB
 .gbc  → GBC
 .gg   → GG
+.ws   → WS
+.wsc  → WS (WonderSwan Color; mesmo core/magic)
 .pce  → PCE
 .gba  → GBA
 .nes  → NES
 .sfc/.smc/.fig → SNES
 ```
 
-ZIPs são expandidos antes da importação; somente entradas `.gg` são extraídas.
+ZIPs são expandidos antes da importação; somente entradas `.gg`, `.ws` e `.wsc` são extraídas. `.wsc` é normalizado para o formato lógico `WS`.
 
 Qualquer valor diferente cai em `SNES` no `createEmulator`. Isso é intencional como fallback, mas pode mascarar bugs de extensão.
 
@@ -111,6 +116,7 @@ Qualquer valor diferente cai em `SNES` no `createEmulator`. Isso é intencional 
 | GB web | `EMMUGMB1` + JSON do oxGBC |
 | GBC web | `EMMUGBC1` + JSON do oxGBC |
 | GG web | `EMMUGG01` + bincode do `smsgg-core` |
+| WS web | `EMMUWS01` + versão u32 + estado bincode do `swanium-core` |
 | PCE web | `EMMUPCE1` + bincode |
 | GBA web | `EMMUSAVE1` |
 | SNES web | bincode do Super Sabicom |
@@ -135,9 +141,10 @@ Ao mudar um formato, **troque o magic/version** e ofereça caminho de recuperaç
 | GBA | 240×160 | 240×160 |
 | GB/GBC | 160×144 | 160×144 |
 | GG | 160×144 | 160×144 (overscan 48 px no Mesen) |
+| WS/WSC | 224×144 | 224×144 (`AutoRotate`/ícones desligados no Mesen) |
 | PCE | 282×242 | 256×242 |
 
-Não “corrija” essa diferença PCE sem verificar overscan e o consumidor do frame.
+Não “corrija” essa diferença PCE sem verificar overscan e o consumidor do frame. O `runFrame` do `emmu-ws` acumula `MASTER_CLOCK_HZ / 60` ciclos e executa um ou dois frames internos do Swanium por chamada; não remova esse acumulador para “simplificar”: o hardware roda a ~75,47 Hz e a UI chama a 60 Hz.
 
 ### 4.6 Controle PCE
 
@@ -153,14 +160,22 @@ Não “corrija” essa diferença PCE sem verificar overscan e o consumidor do 
 - A UI esconde P2, X/Y, shoulder e Select no GG; não os reexiba como funcionais.
 - No desktop, o Mesen lê `A`, `B`, `Start` e as setas do `DebugControllerState`; os demais botões são inofensivos.
 
-### 4.8 Teclado
+### 4.8 Controle WonderSwan
+
+- O hardware tem dois direcionais de 4 vias (X e Y), A, B e Start; não há Select nem P2.
+- `Up/Down/Left/Right` → primeiro pad (`KeyState::X1..X4` no Swanium; `up/down/left/right` no `DebugControllerState` do Mesen).
+- `U/D/L/R` → segundo pad (`KeyState::Y1..Y4`; `u/d/l/r` no Mesen). A UI usa os nomes dos bindings `X/Y/L/R` e `coreButtonForFormat()` em `useEmulator.js` os converte para `U/D/L/R`.
+- A UI esconde P2 e Select no WS, mostra um pad compacto para o segundo direcional no touch e rotula os bindings como “Segundo pad”.
+- Swanium não expõe o botão de som do hardware; `Select` é ignorado.
+
+### 4.9 Teclado
 
 - `useShortcuts.js` usa `event.code`, com fallback para `event.key`.
 - Alguns browsers embutidos emitem `code: ""`.
 - `blur` da janela deve liberar todos os botões.
 - `pressButton` no `Player.vue` chama `preventDefault()` e `blur()` no elemento para evitar scroll/foco preso.
 
-### 4.9 Persistência
+### 4.10 Persistência
 
 - IndexedDB: `emmu-library`, versão 2, stores `games` e `settings`.
 - `MAX_SAVE_HISTORY = 10`.
@@ -181,7 +196,7 @@ App.vue
    → EmulationWorkerClient
      → snes.worker.js
        → initialize | restart | runFrame | setButton | saveState | loadState
-       → emmu_snes / emmu_nes / emmu_gba / emmu_gbc / emmu_gb / emmu_gg / emmu_pce
+       → emmu_snes / emmu_nes / emmu_gba / emmu_gbc / emmu_gb / emmu_gg / emmu_ws / emmu_pce
  → useAudio.js
    → audio-worklet.js
  → libraryStore.js
@@ -207,7 +222,7 @@ Comandos Tauri: `mesen_init_rom`, `mesen_run_frame`, `mesen_set_button`, `mesen_
 Notificações Mesen:
 
 - `NOTIFICATION_PPU_FRAME_DONE = 7` — NES;
-- `NOTIFICATION_REFRESH_SOFTWARE_RENDERER = 22` — SNES/GBA/GB/GBC/GG/PCE.
+- `NOTIFICATION_REFRESH_SOFTWARE_RENDERER = 22` — SNES/GBA/GB/GBC/GG/WS/PCE.
 
 ---
 
@@ -253,9 +268,11 @@ EMMU_GBC_TEST_ROM="/caminho/jogo.gbc" cargo test -p emmu-gbc
 EMMU_GB_TEST_ROM="/caminho/jogo.gb" cargo test -p emmu-gb
 EMMU_PCE_TEST_ROM="/caminho/jogo.pce" cargo test -p emmu-pce
 EMMU_GG_TEST_ROM="/caminho/jogo.gg" cargo test -p emmu-gg
+EMMU_WS_TEST_ROM="/caminho/jogo.ws" cargo test -p emmu-ws
 MESEN_TEST_ROM="/caminho/jogo.nes" cargo test -p emmu-mesen-sys
 MESEN_PCE_TEST_ROM="/caminho/jogo.pce" cargo test -p emmu-mesen-sys
 MESEN_GG_TEST_ROM="/caminho/jogo.gg" cargo test -p emmu-mesen-sys
+MESEN_WS_TEST_ROM="/caminho/jogo.ws" cargo test -p emmu-mesen-sys
 ```
 
 Use ROMs de jogo, não BIOS, para validação de UI/input.
@@ -362,6 +379,14 @@ Worker.prototype.postMessage = function (msg, ...rest) {
 4. A UI deve oferecer reinício limpo ou voltar à biblioteca.
 5. Não apague automaticamente o estado corrompido sem confirmação.
 
+### 7.8 WS lento, áudio desafinado ou segundo pad morto
+
+1. Confirme que `crates/emmu-ws/src/lib.rs` ainda acumula `CYCLES_PER_UI_FRAME` e executa `System::run_frame` enquanto o carry ≥ `CYCLES_PER_FRAME`.
+2. Não troque `audio_sample_rate()` para “compensar” 60 Hz: o APU do Swanium gera 24 kHz reais; o acumulador resolve o tempo.
+3. Confirme `coreButtonForFormat()` em `useEmulator.js`: X/Y/L/R viram U/D/L/R apenas quando `format === "WS"`.
+4. No desktop, `apply_button_to_state()` em `platforms/desktop/src/lib.rs` deve continuar mapeando U/D/L/R para os campos `u/d/l/r` do `DebugControllerState`.
+5. Se o frame vier 224×157, `WS_LCD_SHOW_ICONS_OFFSET` em `connect_ws_controllers()` foi ligado por engano.
+
 ---
 
 ## 8. Armadilhas históricas — não repita
@@ -379,6 +404,7 @@ Worker.prototype.postMessage = function (msg, ...rest) {
 | Mesen travava ao sair | FFI após `Release()` | guard atômico de shutdown |
 | Build workspace quebrava | dev-deps de `super-sabicom`/`tetanes-core` e vendor PCE | crates fora do workspace / excluídos |
 | Botão grudava em browser embutido | `event.code === ""` | fallback para `event.key` |
+| WS rodava em câmera lenta | Swanium gera frames de ~75 Hz, UI chama a 60 Hz | acumulador de ciclos em `emmu-ws::run_frame` |
 
 ---
 
@@ -407,6 +433,10 @@ crates/emmu-mesen-sys/
 ├── src/pce_palette.rs         # paleta PCE
 ├── build.rs                   # -lMesenCore
 └── scripts/build-sdl2.sh      # runtime SDL2
+
+crates/emmu-ws/
+├── src/lib.rs                 # fachada WASM, timing, input, save state
+└── vendor/swanian-core/       # core WS vendorizado (MIT); NÃO editar
 
 crates/emmu-pce/src/lib.rs     # config PCE, input, save state
 crates/emmu-gb/src/lib.rs      # GB DMG / oxGBC
@@ -460,13 +490,15 @@ Se pedirem para adicionar outro sistema, não comece pelo worker. Siga esta chec
 - Não edite diretamente `js/bridge.js`, `dist/`, `runtime/`, `runtime-link/` ou `src/wasm/`.
 - `runtime/` e `runtime-link/` são gerados e ignorados.
 - `src/wasm/` é gerado e ignorado; `dist/` é saída de build.
-- `crates/emmu-pce/vendor/jgenesis` **não** é submódulo: é código vendorizado dentro do `emmu-pce`.
+- `crates/emmu-ws` ainda é um diretório normal no repositório principal (sem remote/submódulo); toda a dependência de emulação fica dentro dele, em `vendor/swanian-core`.
+- `crates/emmu-pce/vendor/jgenesis` e `crates/emmu-ws/vendor/swanian-core` **não** são submódulos: são códigos vendorizados dentro dos respectivos cores.
 - `crates/emmu-gba/vendor/web-gba-emulator` e `crates/emmu-mesen-sys/vendor/SDL` são submódulos de terceiros; evite commits locais neles.
 - `crates/tetanes-core`, `crates/emmu-super-sabicom` e `crates/emmu-pce/vendor` são excluídos do workspace por razões de build.
 
 ### Estado atual
 
 - `crates/emmu-gg` é submodule de `EspetoRx/emmu-gg` @ `081ee8e`, já publicado.
+- `crates/emmu-ws` foi adicionado como código local (Swanium MIT, @ `021d61d`); decida o remote antes de transformá-lo em submodule.
 - A integração de UI/desktop do GG permanece em commits locais em `emmu-web` e `emmu-desktop`; atualize os gitlinks depois de commitar nesses submódulos.
 - O repositório principal não foi pushed.
 - `emmu-gb` e `emmu-pce` também têm commits locais; confirme se os remotos existem antes de `git push`.
@@ -477,6 +509,8 @@ Se pedirem para adicionar outro sistema, não comece pelo worker. Siga esta chec
 
 - Não usar Mesen no web nem WASM no desktop.
 - Não trocar `TwoButtonGamepad` por 6 botões no PCE “para expor X/Y”.
+- Não remover o acumulador de ciclos do `emmu-ws` nem “corrigir” a taxa de áudio para 19 kHz: o Swanium roda a ~75 Hz e o acumulador converte para os 60 Hz da UI.
+- Não tratar X/Y/L/R do WonderSwan como botões de face/shoulder: eles são o segundo direcional.
 - Não editar arquivos gerados.
 - Não committar `node_modules`, `dist`, `runtime`, `runtime-link` ou WASM gerado.
 - Não usar `canvas.toBlob()` para miniatura desktop.
@@ -525,7 +559,8 @@ Para mudanças em input:
 - `pressed:true` e `pressed:false` observados;
 - `blur` libera tudo;
 - teste em ROM de jogo real;
-- instrumentação removida.
+- instrumentação removida;
+- no WS, primeiro e segundo direcionais testados (web e desktop).
 
 Para mudanças em licenças/vendor:
 
