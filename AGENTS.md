@@ -22,17 +22,17 @@ Se não souber a resposta, pergunte ao usuário **qual ROM, qual plataforma e qu
 | Item | Fato |
 | --- | --- |
 | UI | Vue 3 + Vite 6 em `platforms/web/ui`, compartilhada por web, Tauri desktop e scripts mobile |
-| Web | Web Worker (`snes.worker.js`) + seis pacotes WASM gerados por `wasm-pack` |
+| Web | Web Worker (`snes.worker.js`) + sete pacotes WASM gerados por `wasm-pack` |
 | Desktop | Tauri 2 + Rust; emulação via MesenCE (`emmu-mesen-sys`), não via WASM |
-| Consoles | NES, SNES, GBA, GB, GBC, PCE |
+| Consoles | NES, SNES, GBA, GB, GBC, GG, PCE |
 | Persistência | IndexedDB `emmu-library` v2; `localStorage` para filtros e controles |
-| Save states | `EMMUGMB1`, `EMMUGBC1`, `EMMUPCE1`, `EMMUSAVE1`, bincode/TetaNES no web; `.mss` no desktop |
+| Save states | `EMMUGMB1`, `EMMUGBC1`, `EMMUGG01`, `EMMUPCE1`, `EMMUSAVE1`, bincode/TetaNES no web; `.mss` no desktop |
 | Frames web | RGBA8888 via `putImageData` |
 | Frames desktop | BMP 24-bit via protocolo `emmu-frame://`; miniatura via PNG gerado no Rust |
-| Cores GPL | GB, GBC e PCE no web; Mesen no desktop |
+| Cores GPL | GB, GBC, GG e PCE no web; Mesen no desktop |
 | Cores MIT/permisivos | NES, SNES, GBA no web |
-| Submódulos | Todos os crates e plataformas são submódulos Git; nunca edite como se fossem pastas normais |
-| Push | Nada foi pushed; vários commits são locais. Não faça push sem confirmar remotos |
+| Submódulos | Todos os crates e plataformas são submódulos Git, incluindo `crates/emmu-gg` (`EspetoRx/emmu-gg`) |
+| Push | `emmu-gg` foi publicado; os demais repositórios/commits continuam locais. Não faça push sem confirmar remotos |
 
 ---
 
@@ -59,6 +59,8 @@ Para entender o projeto rapidamente, nesta ordem:
 | Console errado é detectado | `platforms/web/ui/src/composables/snes.js` (`createEmulator`) | `platforms/desktop/src/lib.rs` (`mesen_init_rom`) |
 | Teclado não responde / botão gruda | `platforms/web/ui/src/composables/useShortcuts.js` | `useEmulator.js::setButton` |
 | Controle touch errado | `platforms/web/ui/src/components/Player.vue` | `useEmulator.js::setButton` |
+| GG sem áudio/vídeo no web | `crates/emmu-gg/src/lib.rs` (`default_config`) | `smsgg-core` em `vendor/jgenesis` |
+| GG com frame 256x240 no desktop | `crates/emmu-mesen-sys/src/lib.rs` (`SMS_GAME_GEAR_OVERSCAN`) | `platforms/desktop/src/lib.rs` (`mesen_init_rom`) |
 | Setas PCE travadas | `crates/emmu-pce/src/lib.rs` (`default_config`) | `input.rs` do vendor JGenesis |
 | PCE com tela preta no desktop | `crates/emmu-mesen-sys/src/pce_palette.rs` | `connect_pce_controllers` |
 | Sem imagem no desktop | `platforms/desktop/src/lib.rs` (`frame_as_bmp`, `emmu-frame`) | notificações do Mesen |
@@ -84,18 +86,21 @@ Não quebre estes contratos sem uma razão explícita e testes.
   - com Tauri → `MesenTauriClient`;
   - sem Tauri → `EmulationWorkerClient`.
 - No desktop, **todos** os consoles usam Mesen. Nenhum WASM é usado no desktop.
-- No web, NES/SNES/GBA/GB/GBC/PCE usam cores separados, todos via Worker.
+- No web, NES/SNES/GBA/GB/GBC/GG/PCE usam cores separados, todos via Worker.
 
 ### 4.2 Extensões e formatos
 
 ```text
 .gb   → GB
 .gbc  → GBC
+.gg   → GG
 .pce  → PCE
 .gba  → GBA
 .nes  → NES
 .sfc/.smc/.fig → SNES
 ```
+
+ZIPs são expandidos antes da importação; somente entradas `.gg` são extraídas.
 
 Qualquer valor diferente cai em `SNES` no `createEmulator`. Isso é intencional como fallback, mas pode mascarar bugs de extensão.
 
@@ -105,6 +110,7 @@ Qualquer valor diferente cai em `SNES` no `createEmulator`. Isso é intencional 
 | --- | --- |
 | GB web | `EMMUGMB1` + JSON do oxGBC |
 | GBC web | `EMMUGBC1` + JSON do oxGBC |
+| GG web | `EMMUGG01` + bincode do `smsgg-core` |
 | PCE web | `EMMUPCE1` + bincode |
 | GBA web | `EMMUSAVE1` |
 | SNES web | bincode do Super Sabicom |
@@ -128,6 +134,7 @@ Ao mudar um formato, **troque o magic/version** e ofereça caminho de recuperaç
 | SNES | 256×224 | 256×224 |
 | GBA | 240×160 | 240×160 |
 | GB/GBC | 160×144 | 160×144 |
+| GG | 160×144 | 160×144 (overscan 48 px no Mesen) |
 | PCE | 282×242 | 256×242 |
 
 Não “corrija” essa diferença PCE sem verificar overscan e o consumidor do frame.
@@ -139,14 +146,21 @@ Não “corrija” essa diferença PCE sem verificar overscan e o consumidor do 
 - Existe o teste `default_pad_is_two_button` para proteger isso.
 - A UI esconde X/Y e shoulder no PCE. Não os reexiba como se fossem funcionais.
 
-### 4.7 Teclado
+### 4.7 Controle Game Gear
+
+- `set_button` em `crates/emmu-gg/src/lib.rs` mapeia A/B para `SmsGgButton::Button1/Button2` e Start para `Pause`.
+- Select, X, Y, L e R são intencionalmente ignorados: o hardware não os possui.
+- A UI esconde P2, X/Y, shoulder e Select no GG; não os reexiba como funcionais.
+- No desktop, o Mesen lê `A`, `B`, `Start` e as setas do `DebugControllerState`; os demais botões são inofensivos.
+
+### 4.8 Teclado
 
 - `useShortcuts.js` usa `event.code`, com fallback para `event.key`.
 - Alguns browsers embutidos emitem `code: ""`.
 - `blur` da janela deve liberar todos os botões.
 - `pressButton` no `Player.vue` chama `preventDefault()` e `blur()` no elemento para evitar scroll/foco preso.
 
-### 4.8 Persistência
+### 4.9 Persistência
 
 - IndexedDB: `emmu-library`, versão 2, stores `games` e `settings`.
 - `MAX_SAVE_HISTORY = 10`.
@@ -167,7 +181,7 @@ App.vue
    → EmulationWorkerClient
      → snes.worker.js
        → initialize | restart | runFrame | setButton | saveState | loadState
-       → emmu_snes / emmu_nes / emmu_gba / emmu_gbc / emmu_gb / emmu_pce
+       → emmu_snes / emmu_nes / emmu_gba / emmu_gbc / emmu_gb / emmu_gg / emmu_pce
  → useAudio.js
    → audio-worklet.js
  → libraryStore.js
@@ -193,7 +207,7 @@ Comandos Tauri: `mesen_init_rom`, `mesen_run_frame`, `mesen_set_button`, `mesen_
 Notificações Mesen:
 
 - `NOTIFICATION_PPU_FRAME_DONE = 7` — NES;
-- `NOTIFICATION_REFRESH_SOFTWARE_RENDERER = 22` — SNES/GBA/GB/GBC/PCE.
+- `NOTIFICATION_REFRESH_SOFTWARE_RENDERER = 22` — SNES/GBA/GB/GBC/GG/PCE.
 
 ---
 
@@ -238,8 +252,10 @@ EMMU_NES_TEST_ROM="/caminho/jogo.nes" cargo test -p emmu-nes
 EMMU_GBC_TEST_ROM="/caminho/jogo.gbc" cargo test -p emmu-gbc
 EMMU_GB_TEST_ROM="/caminho/jogo.gb" cargo test -p emmu-gb
 EMMU_PCE_TEST_ROM="/caminho/jogo.pce" cargo test -p emmu-pce
+EMMU_GG_TEST_ROM="/caminho/jogo.gg" cargo test -p emmu-gg
 MESEN_TEST_ROM="/caminho/jogo.nes" cargo test -p emmu-mesen-sys
 MESEN_PCE_TEST_ROM="/caminho/jogo.pce" cargo test -p emmu-mesen-sys
+MESEN_GG_TEST_ROM="/caminho/jogo.gg" cargo test -p emmu-mesen-sys
 ```
 
 Use ROMs de jogo, não BIOS, para validação de UI/input.
@@ -358,6 +374,7 @@ Worker.prototype.postMessage = function (msg, ...rest) {
 | Desktop sem imagem | tentativa de `try_lock()` no frame | usar `lock()` |
 | PCE desktop preto | falta da paleta padrão do Mesen | `pce_palette.rs` |
 | Frame PCE inconsistente | web 282×242, desktop 256×242 | diferença intencional; não “uniformizar” |
+| GG desktop com bordas 256×240 | `SmsConfig` zerado sem `GameGearOverscan` | 48 px nos 4 lados em `connect_sms_controllers` |
 | GBA web parou após update do vendor | bridge JS não regenerado | `node tools/build-bridge.mjs` |
 | Mesen travava ao sair | FFI após `Release()` | guard atômico de shutdown |
 | Build workspace quebrava | dev-deps de `super-sabicom`/`tetanes-core` e vendor PCE | crates fora do workspace / excluídos |
@@ -449,10 +466,10 @@ Se pedirem para adicionar outro sistema, não comece pelo worker. Siga esta chec
 
 ### Estado atual
 
-- Árvore principal limpa.
-- Documentação commitada.
-- Nada foi pushed.
-- `emmu-gb` e `emmu-pce` têm commits locais; confirme se os remotos existem antes de `git push`.
+- `crates/emmu-gg` é submodule de `EspetoRx/emmu-gg` @ `081ee8e`, já publicado.
+- A integração de UI/desktop do GG permanece em commits locais em `emmu-web` e `emmu-desktop`; atualize os gitlinks depois de commitar nesses submódulos.
+- O repositório principal não foi pushed.
+- `emmu-gb` e `emmu-pce` também têm commits locais; confirme se os remotos existem antes de `git push`.
 
 ---
 

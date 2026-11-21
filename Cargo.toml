@@ -6,6 +6,7 @@ members = [
     "crates/emmu-gba",
     "crates/emmu-gbc",
     "crates/emmu-gb",
+    "crates/emmu-gg",
     "crates/emmu-pce",
     "crates/emmu-frontend",
     "crates/emmu-mesen-sys",
@@ -17,7 +18,12 @@ members = [
 # `emmu-snes`. Mantê-lo fora do workspace evita que o Cargo (e o rust-analyzer)
 # compile os dev-dependencies dele — em especial `compress-tools`, cujo build
 # script exige a biblioteca nativa `libarchive` (que não é necessária em runtime).
-exclude = ["crates/tetanes-core", "crates/emmu-super-sabicom", "crates/emmu-pce/vendor"]
+exclude = [
+    "crates/tetanes-core",
+    "crates/emmu-super-sabicom",
+    "crates/emmu-pce/vendor",
+    "crates/emmu-gg/vendor",
+]
 resolver = "2"
 
 [patch.crates-io]

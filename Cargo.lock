@@ -481,6 +481,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "844c5c0b65be192cb68d570cca1b21a6444431d24e39c084dc0336177015337c"
 dependencies = [
  "clap_builder",
+ "clap_derive",
 ]
 
 [[package]]
@@ -493,6 +494,18 @@ dependencies = [
  "anstyle",
  "clap_lex",
  "strsim",
+]
+
+[[package]]
+name = "clap_derive"
+version = "4.6.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4c174f11f949b9ca8c60580925e282b9cbd5454750e506f08648b2038080cd7"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -936,6 +949,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dsp-gg"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "log",
+ "num",
+ "rand",
+]
+
+[[package]]
 name = "dtoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1029,6 +1052,18 @@ version = "0.1.0"
 dependencies = [
  "oxgbc-core",
  "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "emmu-gg"
+version = "0.1.0"
+dependencies = [
+ "bincode 2.0.1",
+ "getrandom 0.4.3",
+ "jgenesis-common-gg",
+ "smsgg-config",
+ "smsgg-core",
  "wasm-bindgen",
 ]
 
@@ -1963,11 +1998,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "jgenesis-common-gg"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "bytemuck",
+ "clap",
+ "jgenesis-proc-macros-gg",
+ "js-sys",
+ "log",
+ "multiversion",
+ "rand",
+ "rustc-hash",
+ "serde",
+ "time",
+]
+
+[[package]]
 name = "jgenesis-proc-macros"
 version = "0.15.0"
 dependencies = [
  "bincode 2.0.1",
  "jgenesis-common",
+ "log",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "syn 3.0.10",
+ "test-log",
+ "toml 1.2.1+spec-1.1.0",
+]
+
+[[package]]
+name = "jgenesis-proc-macros-gg"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "jgenesis-common-gg",
  "log",
  "proc-macro2",
  "quote",
@@ -3613,6 +3680,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "149309498a5f7334b12ddae0cad8aba81ce785fe91755068867e017cf98fee46"
 
 [[package]]
+name = "smsgg-config"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "clap",
+ "jgenesis-common-gg",
+ "jgenesis-proc-macros-gg",
+ "regex",
+ "serde",
+]
+
+[[package]]
+name = "smsgg-core"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "crc",
+ "dsp-gg",
+ "jgenesis-common-gg",
+ "jgenesis-proc-macros-gg",
+ "log",
+ "smsgg-config",
+ "thiserror 2.0.21",
+ "ti-sn76489",
+ "tinyvec",
+ "ym-opll",
+ "z80-emu",
+]
+
+[[package]]
 name = "socket2"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4224,6 +4321,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ad99c4c6d32803332c548b1af0540b357b3f5fc0be8f6c6bfe8b2e6ae784070"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "ti-sn76489"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "clap",
+ "jgenesis-common-gg",
+ "jgenesis-proc-macros-gg",
+ "serde",
 ]
 
 [[package]]
@@ -5222,6 +5330,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ym-opll"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "jgenesis-common-gg",
+ "log",
+]
+
+[[package]]
 name = "yoke"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5242,6 +5359,16 @@ dependencies = [
  "quote",
  "syn 3.0.10",
  "synstructure",
+]
+
+[[package]]
+name = "z80-emu"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "jgenesis-common-gg",
+ "log",
+ "rand",
 ]
 
 [[package]]

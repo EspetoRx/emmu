@@ -46,10 +46,12 @@ A mesma UI atende web e desktop. A troca de backend acontece em `createEmulator(
 | Game Boy Advance | `.gba` | `emmu-gba` → Web-GBA/gbajs | MesenCE (GBA) | `EMMUSAVE1` / `.mss` |
 | Game Boy | `.gb` | `emmu-gb` → oxGBC (`Dmg`) | MesenCE (`Gameboy`) | `EMMUGMB1` / `.mss` |
 | Game Boy Color | `.gbc` | `emmu-gbc` → oxGBC (`Cgb`) | MesenCE (`AutoFavorGbc`) | `EMMUGBC1` / `.mss` |
+| Sega Game Gear | `.gg` | `emmu-gg` → JGenesis `smsgg-core` | MesenCE (`GameGear`) | `EMMUGG01` / `.mss` |
 | PC Engine / TurboGrafx-16 | `.pce` | `emmu-pce` → JGenesis `pce-core` | MesenCE (`TurboGrafx`) | `EMMUPCE1` / `.mss` |
 
 Detalhes importantes:
 
+- **Game Gear** usa os botões 1/2 (mapeados de A/B) e Start; não há Select, P2, X/Y ou L/R. ROMs `.gg` também podem ser importadas dentro de um `.zip`.
 - **PC Engine** usa HuCard (`.pce`); não há suporte a jogos de CD-ROM.
 - O PCE web usa gamepad de **2 botões** (I/II). O modo 6 botões alternava o estado extra em cada transição de `CLR` e fazia as setas pararem de responder em vários jogos.
 - O PCE web gera frames RGBA8888 de **282×242**; o desktop/Mesen publica **256×242**.
@@ -61,7 +63,7 @@ Detalhes importantes:
 
 ## Recursos
 
-- **Biblioteca persistente:** ROMs são guardadas como blobs no IndexedDB; a abertura aceita vários arquivos de uma vez. Se uma entrada antiga perder o blob, basta reimportar a mesma ROM.
+- **Biblioteca persistente:** ROMs são guardadas como blobs no IndexedDB; a abertura aceita vários arquivos de uma vez, incluindo `.zip` com ROMs `.gg`. Se uma entrada antiga perder o blob, basta reimportar a mesma ROM.
 - **Overlay de carregamento:** mostra progresso real (`x de y jogos`), barra e porcentagem enquanto o IndexedDB é percorrido com cursor.
 - **Save states:** checkpoint automático a cada 5 segundos, ao voltar para a biblioteca, ao background e ao desmontar o player. Save manual entra no histórico; os 10 estados anteriores ficam disponíveis em **Histórico**.
 - **Recuperação:** estado corrompido oferece reinício limpo ou retorno à biblioteca para escolher outro save.
@@ -86,6 +88,7 @@ App.vue
        │                                            ├─ emmu_gba (JS bridge + WASM)
        │                                            ├─ emmu_gbc.wasm
        │                                            ├─ emmu_gb.wasm
+       │                                            ├─ emmu_gg.wasm
        │                                            └─ emmu_pce.wasm
        └─ useAudio.js ── audio-worklet.js
 ```
@@ -103,7 +106,7 @@ Vue UI
        └─ emmu-frame://localhost/frame?n=<nonce>  →  frames BMP gerados no Rust
 ```
 
-O Mesen é inicializado em modo headless. Os frames chegam pelas notificações `PPU_FRAME_DONE` (NES) e `REFRESH_SOFTWARE_RENDERER` (SNES/GBA/GB/GBC/PCE). Save states são gravados em arquivos `.mss` temporários e devolvidos à UI como bytes para o IndexedDB.
+O Mesen é inicializado em modo headless. Os frames chegam pelas notificações `PPU_FRAME_DONE` (NES) e `REFRESH_SOFTWARE_RENDERER` (SNES/GBA/GB/GBC/GG/PCE). Save states são gravados em arquivos `.mss` temporários e devolvidos à UI como bytes para o IndexedDB.
 
 ### Persistência
 
@@ -132,6 +135,8 @@ emmu/
 │   ├── emmu-gba/                   # ponte WASM/JS do Web-GBA (gbajs)
 │   ├── emmu-gbc/                   # core Game Boy Color via oxGBC
 │   ├── emmu-gb/                    # core Game Boy DMG via oxGBC
+│   ├── emmu-gg/                    # core Sega Game Gear via JGenesis smsgg-core
+│   │   └── vendor/jgenesis/        # subset SMS/GG vendorizado (GPL-3.0-only)
 │   ├── emmu-pce/                   # core PC Engine via JGenesis pce-core
 │   ├── emmu-mesen-sys/             # FFI da ABI do MesenCE + runtime SDL2/BIOS
 │   ├── emmu-super-sabicom/         # core SNES upstream (MIT)
@@ -336,15 +341,17 @@ cargo fmt --all -- --check
 cargo check --workspace
 
 # Testes dos núcleos e do desktop
-cargo test -p emmu-pce -p emmu-gb -p emmu-gbc -p emmu-mesen-sys -p desktop
+cargo test -p emmu-gg -p emmu-pce -p emmu-gb -p emmu-gbc -p emmu-mesen-sys -p desktop
 
 # Testes com ROM real (opcionais)
 EMMU_NES_TEST_ROM="/caminho/jogo.nes" cargo test -p emmu-nes
 EMMU_GBC_TEST_ROM="/caminho/jogo.gbc" cargo test -p emmu-gbc
 EMMU_GB_TEST_ROM="/caminho/jogo.gb" cargo test -p emmu-gb
 EMMU_PCE_TEST_ROM="/caminho/jogo.pce" cargo test -p emmu-pce
+EMMU_GG_TEST_ROM="/caminho/jogo.gg" cargo test -p emmu-gg
 MESEN_TEST_ROM="/caminho/jogo.nes" cargo test -p emmu-mesen-sys
 MESEN_PCE_TEST_ROM="/caminho/jogo.pce" cargo test -p emmu-mesen-sys
+MESEN_GG_TEST_ROM="/caminho/jogo.gg" cargo test -p emmu-mesen-sys
 ```
 
 `cargo test -p emmu-mesen-sys` e `-p desktop` exigem que `MesenCore` esteja linkável (runtime preparado ou `MESEN_LIB_DIR`).
@@ -368,6 +375,7 @@ cargo run -p emmu-snes --example snes_smoke -- Jogo.sfc
 | `crates/emmu-gba` | `EspetoRx/emmu-gba` @ `878a2a6` | ponte WASM/JS GBA | MIT (+ BSD-2-Clause no vendor) |
 | `crates/emmu-gbc` | `EspetoRx/emmu-gbc` @ `da3763c` | core GBC | GPL-3.0-only |
 | `crates/emmu-gb` | `EspetoRx/emmu-gb` @ `5150825` | core GB DMG | GPL-3.0-only |
+| `crates/emmu-gg` | `EspetoRx/emmu-gg` @ `081ee8e` | core Sega Game Gear | GPL-3.0-only |
 | `crates/emmu-pce` | `EspetoRx/emmu-pce` @ `e8a9860` | core PC Engine | GPL-3.0-only |
 | `crates/emmu-mesen-sys` | `EspetoRx/emmu-mesen-sys` @ `46dab68` | FFI Mesen + runtime | sem campo declarado |
 | `crates/emmu-super-sabicom` | `EspetoRx/emmu-super-sabicom` @ `a7b80ad` | core SNES | MIT |
@@ -377,6 +385,7 @@ cargo run -p emmu-snes --example snes_smoke -- Jogo.sfc
 | `crates/emmu-gba/vendor/web-gba-emulator` | `alexcerezo/Web-GBA-Emulator` @ `e760d30` | core GBA JS | BSD-2-Clause |
 | `crates/emmu-mesen-sys/vendor/SDL` | `libsdl-org/SDL` @ `release-2.32.10` | áudio dlopen no desktop | zlib |
 | `crates/emmu-pce/vendor/jgenesis` | código vendorizado (não submodule) @ `8d1bdfb` | `pce-core` | GPL-3.0-only |
+| `crates/emmu-gg/vendor/jgenesis` | código vendorizado (não submodule) @ `8d1bdfb` | `smsgg-core` (subset GG) | GPL-3.0-only |
 
 ---
 
@@ -391,6 +400,7 @@ Este projeto combina código próprio e software de terceiros. Respeite cada lic
 | `tetanes-core` | MIT OR Apache-2.0 | `Copyright (c) 2021 Luke Petherbridge <me@lukeworks.tech>` |
 | `emmu-gb`, `emmu-gbc` | GPL-3.0-only | texto GPLv3 em `LICENSE`; código em `vendor/oxgbc-core` |
 | oxGBC | GPL-3.0-only | `mxmgorin/oxgbc`, commit `b95ff230...`; autor `troidem <mxmgorin@gmail.com>` |
+| `emmu-gg` e JGenesis `smsgg-core` | GPL-3.0-only | `jsgroth/jgenesis`, commit `8d1bdfba...`; subset SMS/GG com hardware forçado para Game Gear |
 | `emmu-pce` e JGenesis `pce-core` | GPL-3.0-only | `jsgroth/jgenesis`, commit `8d1bdfba...`; subset HuCard |
 | Web-GBA / gbajs | BSD-2-Clause | `Copyright (c) 2012, Jeffrey Pfau`; adaptação web por `alexcerezo` |
 | MesenCE / Mesen 2 | GPL-3.0 | `Copyright (C) 2014-2025 Sour`; binário externo, distribuído via `runtime/` |
@@ -417,6 +427,9 @@ crates/emmu-gbc/vendor/oxgbc-core/UPSTREAM.txt
 crates/emmu-gb/LICENSE
 crates/emmu-gb/vendor/oxgbc-core/LICENSE-GPL-3.0
 crates/emmu-gb/vendor/oxgbc-core/UPSTREAM.txt
+crates/emmu-gg/LICENSE
+crates/emmu-gg/UPSTREAM.txt
+crates/emmu-gg/vendor/jgenesis/LICENSE
 crates/emmu-pce/LICENSE
 crates/emmu-pce/UPSTREAM.txt
 crates/emmu-pce/vendor/jgenesis/LICENSE
@@ -429,7 +442,7 @@ crates/emmu-mesen-sys/vendor/SDL/LICENSE.txt
 crates/emmu-mesen-sys/runtime/LICENSE-SDL2.txt   # gerado pelo script
 ```
 
-> **Atenção:** os núcleos GB, GBC e PCE são GPL-3.0; o MesenCE também é GPLv3. Um bundle desktop que inclui Mesen e/ou um bundle web que inclui esses WASM modules precisa observar as obrigações da GPLv3, incluindo disponibilizar o código-fonte correspondente e manter os avisos de licença. Este documento é informativo, não uma opinião jurídica.
+> **Atenção:** os núcleos GB, GBC, GG e PCE são GPL-3.0; o MesenCE também é GPLv3. Um bundle desktop que inclui Mesen e/ou um bundle web que inclui esses WASM modules precisa observar as obrigações da GPLv3, incluindo disponibilizar o código-fonte correspondente e manter os avisos de licença. Este documento é informativo, não uma opinião jurídica.
 
 ---
 
