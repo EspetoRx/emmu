@@ -43,3 +43,6 @@
 [submodule "crates/emmu-ws"]
 	path = crates/emmu-ws
 	url = https://github.com/EspetoRx/emmu-ws.git
+[submodule "crates/emmu-sms"]
+	path = crates/emmu-sms
+	url = https://github.com/EspetoRx/emmu-sms.git

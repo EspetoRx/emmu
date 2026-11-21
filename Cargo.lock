@@ -959,6 +959,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dsp-sms"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "log",
+ "num",
+ "rand",
+]
+
+[[package]]
 name = "dtoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1089,6 +1099,18 @@ dependencies = [
  "jgenesis-common",
  "pce-config",
  "pce-core",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "emmu-sms"
+version = "0.1.0"
+dependencies = [
+ "bincode 2.0.1",
+ "getrandom 0.4.3",
+ "jgenesis-common-sms",
+ "smsgg-config-sms",
+ "smsgg-core-sms",
  "wasm-bindgen",
 ]
 
@@ -2025,6 +2047,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "jgenesis-common-sms"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "bytemuck",
+ "clap",
+ "jgenesis-proc-macros-sms",
+ "js-sys",
+ "log",
+ "multiversion",
+ "rand",
+ "rustc-hash",
+ "serde",
+ "time",
+]
+
+[[package]]
 name = "jgenesis-proc-macros"
 version = "0.15.0"
 dependencies = [
@@ -2045,6 +2084,21 @@ version = "0.15.0"
 dependencies = [
  "bincode 2.0.1",
  "jgenesis-common-gg",
+ "log",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "syn 3.0.10",
+ "test-log",
+ "toml 1.2.1+spec-1.1.0",
+]
+
+[[package]]
+name = "jgenesis-proc-macros-sms"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "jgenesis-common-sms",
  "log",
  "proc-macro2",
  "quote",
@@ -3702,6 +3756,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "smsgg-config-sms"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "clap",
+ "jgenesis-common-sms",
+ "jgenesis-proc-macros-sms",
+ "regex",
+ "serde",
+]
+
+[[package]]
 name = "smsgg-core"
 version = "0.15.0"
 dependencies = [
@@ -3717,6 +3783,24 @@ dependencies = [
  "tinyvec",
  "ym-opll",
  "z80-emu",
+]
+
+[[package]]
+name = "smsgg-core-sms"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "crc",
+ "dsp-sms",
+ "jgenesis-common-sms",
+ "jgenesis-proc-macros-sms",
+ "log",
+ "smsgg-config-sms",
+ "thiserror 2.0.21",
+ "ti-sn76489-sms",
+ "tinyvec",
+ "ym-opll-sms",
+ "z80-emu-sms",
 ]
 
 [[package]]
@@ -4350,6 +4434,17 @@ dependencies = [
  "clap",
  "jgenesis-common-gg",
  "jgenesis-proc-macros-gg",
+ "serde",
+]
+
+[[package]]
+name = "ti-sn76489-sms"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "clap",
+ "jgenesis-common-sms",
+ "jgenesis-proc-macros-sms",
  "serde",
 ]
 
@@ -5358,6 +5453,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ym-opll-sms"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "jgenesis-common-sms",
+ "log",
+]
+
+[[package]]
 name = "yoke"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5386,6 +5490,16 @@ version = "0.15.0"
 dependencies = [
  "bincode 2.0.1",
  "jgenesis-common-gg",
+ "log",
+ "rand",
+]
+
+[[package]]
+name = "z80-emu-sms"
+version = "0.15.0"
+dependencies = [
+ "bincode 2.0.1",
+ "jgenesis-common-sms",
  "log",
  "rand",
 ]
