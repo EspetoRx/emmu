@@ -462,6 +462,8 @@ crates/emmu-mesen-sys/runtime/LICENSE-SDL2.txt   # gerado pelo script
 
 ## Contribuindo
 
+Agentes de IA e assistentes de código devem ler [`AGENTS.md`](AGENTS.md) antes de alterar qualquer arquivo: ele contém o mapa de decisão, os contratos internos, os playbooks de debugging e as armadilhas históricas.
+
 1. Crie uma branch no submódulo relevante.
 2. Rode `cargo fmt --all -- --check`, `cargo check --workspace` e os testes do core alterado.
 3. Para mudanças na UI, rode `npm run build` em `platforms/web/ui`.
