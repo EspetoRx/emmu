@@ -407,7 +407,7 @@ Este projeto combina código próprio e software de terceiros. Respeite cada lic
 Arquivos de licença importantes:
 
 ```text
-crates/emmu-nes/LICENSE
+crates/emmu-nes/LICENSE.
 crates/emmu-snes/LICENSE
 crates/emmu-gba/LICENSE
 crates/emmu-gba/LICENSE-WEB-GBA-EMULATOR.txt
