@@ -368,7 +368,7 @@ cargo run -p emmu-snes --example snes_smoke -- Jogo.sfc
 | `crates/emmu-gba` | `EspetoRx/emmu-gba` @ `878a2a6` | ponte WASM/JS GBA | MIT (+ BSD-2-Clause no vendor) |
 | `crates/emmu-gbc` | `EspetoRx/emmu-gbc` @ `da3763c` | core GBC | GPL-3.0-only |
 | `crates/emmu-gb` | `EspetoRx/emmu-gb` @ `5150825` | core GB DMG | GPL-3.0-only |
-| `crates/emmu-pce` | `EspetoRx/emmu-pce` @ `700abff` | core PC Engine | GPL-3.0-only |
+| `crates/emmu-pce` | `EspetoRx/emmu-pce` @ `e8a9860` | core PC Engine | GPL-3.0-only |
 | `crates/emmu-mesen-sys` | `EspetoRx/emmu-mesen-sys` @ `46dab68` | FFI Mesen + runtime | sem campo declarado |
 | `crates/emmu-super-sabicom` | `EspetoRx/emmu-super-sabicom` @ `a7b80ad` | core SNES | MIT |
 | `crates/tetanes-core` | `EspetoRx/tetanes-core` @ `e27c108` | core NES | MIT OR Apache-2.0 |
