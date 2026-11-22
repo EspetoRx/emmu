@@ -138,11 +138,11 @@ Qualquer valor diferente cai em `SNES` no `createEmulator`. Isso é intencional 
 | GBA web | `EMMUSAVE1` |
 | SNES web | bincode do Super Sabicom |
 | NES web | serialização do TetaNES |
-| **NDS web/desktop** | `EMMUNDS1` + `u32` LE version + estado do `PersistentWriteSavestate` do dust |
+| **NDS web/desktop** | `EMMUNDS1` + `u32` LE version `2` + tamanho/estado do `PersistentWriteSavestate` do dust + tamanho/ save RAM do cartucho |
 | **N64 web/desktop** | gzip criado pelo core em `/savestate.gz` (`_neil_serialize` / `_neil_unserialize`) |
 | Desktop | arquivos `.mss` do Mesen |
 
-Ao mudar um formato, **troque o magic/version** e ofereça caminho de recuperação. Nunca faça load silencioso de estado incompatível. No N64 não há magic: o bridge valida o retorno booleano e o tamanho do arquivo. No NDS, o load rejeita magic ou versão diferentes; a versão atual é `1`.
+Ao mudar um formato, **troque o magic/version** e ofereça caminho de recuperação. Nunca faça load silencioso de estado incompatível. No N64 não há magic: o bridge valida o retorno booleano e o tamanho do arquivo. No NDS, o load rejeita magic/versão desconhecidos e comprimentos inconsistentes; a versão atual é `2` (estados v1 ainda são aceitos, mas sem save RAM). O dust marca a save RAM do cartucho com `#[savestate(skip)]`; por isso o save state NDS precisa carregar a save RAM dentro do próprio blob — sem isso, um save in-game some ao reabrir o jogo ou ao restaurar um estado do histórico. Cartuchos com código de jogo começando por `I` (Pokémon Black/White) exigem `has_ir = true` no FLASH do dust (já implementado). Ainda assim, o dust pinned no commit `76d79f2` apresenta “The save data could not be accessed” com `Pokemon - White Version (USA, Europe) (NDSi Enhanced).nds` (256 MiB) também no frontend web upstream; trate como limitação do core, não como bug do envelope de save state do Emmu.
 
 ### 4.4 Frames
 
