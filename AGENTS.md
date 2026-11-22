@@ -1,5 +1,3 @@
-# AGENTS.md
-
 > Manual operacional para qualquer agente de IA que vá ler, manter ou corrigir o Emmu.
 > Para contexto humano, comece pelo [`README.md`](README.md). Para contexto de código, este arquivo é a fonte mais rápida.
 
@@ -9,7 +7,7 @@
 
 Antes de alterar código, responda mentalmente a três perguntas:
 
-1. **O problema é no web ou no desktop?** Os backends são diferentes.
+1. **O problema é no web, no desktop ou nos dois?** Os backends são diferentes — e o N64 é diferente dos dois.
 2. **Qual core está envolvido?** Cada console tem um crate, um WASM e um caminho Mesen próprios.
 3. **A mudança precisa de rebuild de WASM, bridge JS, runtime Mesen/SDL ou gitlink de submódulo?**
 
@@ -22,17 +20,17 @@ Se não souber a resposta, pergunte ao usuário **qual ROM, qual plataforma e qu
 | Item | Fato |
 | --- | --- |
 | UI | Vue 3 + Vite 6 em `platforms/web/ui`, compartilhada por web, Tauri desktop e scripts mobile |
-| Web | Web Worker (`snes.worker.js`) + nove pacotes WASM gerados por `wasm-pack` |
-| Desktop | Tauri 2 + Rust; emulação via MesenCE (`emmu-mesen-sys`), não via WASM |
-| Consoles | NES, SNES, GBA, GB, GBC, GG, SMS, WS/WSC, PCE |
+| Web | Web Worker (`snes.worker.js`) + dez pacotes WASM gerados por `wasm-pack` |
+| Desktop | Tauri 2 + Rust; emulação via MesenCE (`emmu-mesen-sys`), **exceto N64**, que roda o mesmo WASM no WebView |
+| Consoles | NES, SNES, GBA, GB, GBC, GG, SMS, WS/WSC, PCE e N64 |
 | Persistência | IndexedDB `emmu-library` v2; `localStorage` para filtros e controles |
-| Save states | `EMMUGMB1`, `EMMUGBC1`, `EMMUGG01`, `EMMUSMS1`, `EMMUWS01`, `EMMUPCE1`, `EMMUSAVE1`, bincode/TetaNES no web; `.mss` no desktop |
+| Save states | `EMMUGMB1`, `EMMUGBC1`, `EMMUGG01`, `EMMUSMS1`, `EMMUWS01`, `EMMUPCE1`, `EMMUSAVE1`, bincode/TetaNES no web; `.mss` no desktop; gzip `/savestate.gz` no N64 |
 | Frames web | RGBA8888 via `putImageData` |
 | Frames desktop | BMP 24-bit via protocolo `emmu-frame://`; miniatura via PNG gerado no Rust |
-| Cores GPL | GB, GBC, GG, SMS e PCE no web; Mesen no desktop |
-| Cores MIT/permisivos | NES, SNES, GBA e WS (Swanium) no web |
-| Submódulos | Todos os crates e plataformas antigos são submódulos; `crates/emmu-ws` é diretório local até receber remote |
-| Push | `emmu-gg` e `emmu-sms` foram publicados; a integração web/desktop do SMS também foi pushed. Não faça push no repositório principal sem confirmar |
+| Cores GPL | GB, GBC, GG, SMS e PCE no web; Mesen no desktop; N64 (Emmu) |
+| Cores MIT/permisivos | NES, SNES, GBA e WS (Swanium) no web; N64Wasm (vendor, MIT) |
+| Submódulos | Todos os crates e plataformas antigos são submódulos; `crates/emmu-ws` é diretório local até receber remote; `crates/emmu-n64` é submodule de `EspetoRx/emmu-n64` |
+| Versão UI | `0.2.0` — inclui N64, toasts e analógico |
 
 ---
 
@@ -47,7 +45,7 @@ Para entender o projeto rapidamente, nesta ordem:
 5. `platforms/web/ui/src/workers/snes.worker.js` — protocolo do worker.
 6. `platforms/desktop/src/lib.rs` — comandos Tauri, frames, save states e menu.
 7. `crates/emmu-mesen-sys/src/lib.rs` — ABI e wrappers do Mesen.
-8. O `README.md` do core específico envolvido no bug.
+8. O `README.md` do core específico envolvido no bug (para N64, `crates/emmu-n64/README.md` e `UPSTREAM.txt`).
 
 ---
 
@@ -77,6 +75,12 @@ Para entender o projeto rapidamente, nesta ordem:
 | Build WASM desatualizado | `platforms/web/ui/package.json` (`build:wasm`) | diretório `src/wasm/` |
 | Erro de link Mesen | `crates/emmu-mesen-sys/build.rs` | `scripts/build-sdl2.sh` |
 | Gitlink sujo | submódulo específico | repositório principal |
+| **N64 não inicia / tela preta / loop não arranca** | `crates/emmu-n64/js/bridge.js` (`cfgLines[39]`, `cfgLines[43]`) | `crates/emmu-n64/README.md` |
+| **N64 reinicia em 1/4 da tela** | `crates/emmu-n64/js/bridge.js` (`_neil_reset`) | `snes.worker.js` (`case "restart"` N64) |
+| **N64 com altura/tamanho errado no desktop** | `platforms/web/ui/src/style.css` (`.n64-canvas`, `aspect-ratio: 4/3`) | `crates/emmu-n64/src/wasm.rs` (`width`/`height`) |
+| **Analógico N64 não responde** | `crates/emmu-n64/js/bridge.js` (`__n64PushControls`) | `useControls.js` (`Analog*`) / `useEmulator.js::coreButtonForFormat` |
+| **Save state N64 falha** | `crates/emmu-n64/js/bridge.js` (`/savestate.gz`) | `snes.worker.js` (`case "saveState"/"loadState"`) |
+| **Console N64 no desktop** | `platforms/desktop/src/lib.rs` (`mesen_init_rom` rejeita) | `snes.js` (`createEmulator` nunca usa Mesen para N64) |
 
 ---
 
@@ -88,9 +92,10 @@ Não quebre estes contratos sem uma razão explícita e testes.
 
 - `createEmulator(romBytes, format)` em `snes.js`:
   - com Tauri → `MesenTauriClient`;
-  - sem Tauri → `EmulationWorkerClient`.
-- No desktop, **todos** os consoles usam Mesen. Nenhum WASM é usado no desktop.
-- No web, NES/SNES/GBA/GB/GBC/GG/SMS/WS/PCE usam cores separados, todos via Worker.
+  - sem Tauri → `EmulationWorkerClient`;
+  - **`N64` → sempre `EmulationWorkerClient`, inclusive no desktop** (Mesen não implementa N64).
+- No desktop, **todos os consoles exceto N64** usam Mesen. Nenhum WASM é usado no desktop fora do WebView do N64.
+- No web, NES/SNES/GBA/GB/GBC/GG/SMS/WS/PCE/N64 usam cores separados, todos via Worker.
 
 ### 4.2 Extensões e formatos
 
@@ -105,6 +110,7 @@ Não quebre estes contratos sem uma razão explícita e testes.
 .gba  → GBA
 .nes  → NES
 .sfc/.smc/.fig → SNES
+.z64/.n64/.v64 → N64
 ```
 
 ZIPs são expandidos antes da importação; somente entradas `.gg`, `.sms`, `.ws` e `.wsc` são extraídas. `.wsc` é normalizado para o formato lógico `WS`.
@@ -119,14 +125,15 @@ Qualquer valor diferente cai em `SNES` no `createEmulator`. Isso é intencional 
 | GBC web | `EMMUGBC1` + JSON do oxGBC |
 | GG web | `EMMUGG01` + bincode do `smsgg-core` |
 | SMS web | `EMMUSMS1` + bincode do `smsgg-core` |
-| WS web | `EMMUWS01` + versão u32 + estado bincode do `swanium-core` |
+| WS web | `EMMUWS01` + versão u32 + estado bincode do `swanian-core` |
 | PCE web | `EMMUPCE1` + bincode |
 | GBA web | `EMMUSAVE1` |
 | SNES web | bincode do Super Sabicom |
 | NES web | serialização do TetaNES |
+| **N64 web/desktop** | gzip criado pelo core em `/savestate.gz` (`_neil_serialize` / `_neil_unserialize`) |
 | Desktop | arquivos `.mss` do Mesen |
 
-Ao mudar um formato, **troque o magic/version** e ofereça caminho de recuperação. Nunca faça load silencioso de estado incompatível.
+Ao mudar um formato, **troque o magic/version** e ofereça caminho de recuperação. Nunca faça load silencioso de estado incompatível. No N64 não há magic: o bridge valida o retorno booleano e o tamanho do arquivo.
 
 ### 4.4 Frames
 
@@ -134,6 +141,7 @@ Ao mudar um formato, **troque o magic/version** e ofereça caminho de recuperaç
 - Desktop: `emmu-frame://localhost/frame?n=<nonce>` devolve BMP 24-bit, `Content-Type: image/bmp`, `Cache-Control: no-store`.
 - Não tente passar `Vec<u8>`/array JSON de pixels por `invoke`: já foi tentado e é lento/fragil.
 - O canvas que consome `emmu-frame://` fica **tainted**. Para miniatura, use `capturePreview()` → `mesen_capture_preview()` → PNG gerado no Rust.
+- **N64 desktop**: o frame vem do WebGL do worker, não do protocolo `emmu-frame`. O canvas usa `aspect-ratio: 4 / 3`.
 
 ### 4.5 Resoluções
 
@@ -147,6 +155,7 @@ Ao mudar um formato, **troque o magic/version** e ofereça caminho de recuperaç
 | SMS | 256×224 NTSC / 256×240 PAL | 256×224 (o callback publica a dimensão real) |
 | WS/WSC | 224×144 | 224×144 (`AutoRotate`/ícones desligados no Mesen) |
 | PCE | 282×242 | 256×242 |
+| **N64** | **320×240 (4:3)** | **320×240 (4:3, WASM no WebView)** |
 
 Não “corrija” essa diferença PCE sem verificar overscan e o consumidor do frame. O `runFrame` do `emmu-ws` acumula `MASTER_CLOCK_HZ / 60` ciclos e executa um ou dois frames internos do Swanium por chamada; não remova esse acumulador para “simplificar”: o hardware roda a ~75,47 Hz e a UI chama a 60 Hz.
 
@@ -179,21 +188,30 @@ Não “corrija” essa diferença PCE sem verificar overscan e o consumidor do 
 - A UI esconde P2 e Select no WS, mostra um pad compacto para o segundo direcional no touch e rotula os bindings como “Segundo pad”.
 - Swanium não expõe o botão de som do hardware; `Select` é ignorado.
 
-### 4.10 Teclado
+### 4.10 Controle Nintendo 64
+
+- Ações: `Up/Down/Left/Right`, `A/B/Start/Z/L/R`, `CUp/CDown/CLeft/CRight` e `AnalogUp/AnalogDown/AnalogLeft/AnalogRight`.
+- `player` 1–4 é preservado até o worker; `_neil_send_mobile_controls` do N64Wasm **sempre escreve em `neilbuttons[0]`**. Na prática, todos os botões e o analógico chegam ao core como Jogador 1.
+- `mobileMode` (`cfgLines[43] = '1'`) é obrigatório: é ele que dispara o hook `__n64PushControls()` logo após `resetNeilButtons()` no main loop.
+- `disableAudioSync` (`cfgLines[39] = '1'`) é obrigatório: sem ele o main loop não inicia.
+- X, Y e Select não existem no controle do N64 e não têm efeito. O analógico tem quatro ações independentes e um pad compacto na interface touch.
+
+### 4.11 Teclado
 
 - `useShortcuts.js` usa `event.code`, com fallback para `event.key`.
 - Alguns browsers embutidos emitem `code: ""`.
 - `blur` da janela deve liberar todos os botões.
 - `pressButton` no `Player.vue` chama `preventDefault()` e `blur()` no elemento para evitar scroll/foco preso.
 
-### 4.11 Persistência
+### 4.12 Persistência
 
 - IndexedDB: `emmu-library`, versão 2, stores `games` e `settings`.
 - `MAX_SAVE_HISTORY = 10`.
 - `CHECKPOINT_INTERVAL = 5000` ms.
 - `MIN_LIBRARY_LOADING_MS = 450`.
 - Filtros em `localStorage: emmu.library.filters`.
-- Bindings de controle também em `localStorage`.
+- Bindings de controle também em `localStorage`. A migração preenche ações N64 ausentes/inválidas para P1–P4.
+- Toasts: fila com 10 s de duração, pausa no hover, barra de progresso, botão de fechar e dedupe em `useToast.js`.
 
 ---
 
@@ -207,7 +225,7 @@ App.vue
    → EmulationWorkerClient
      → snes.worker.js
        → initialize | restart | runFrame | setButton | saveState | loadState
-       → emmu_snes / emmu_nes / emmu_gba / emmu_gbc / emmu_gb / emmu_gg / emmu_sms / emmu_ws / emmu_pce
+       → emmu_snes / emmu_nes / emmu_gba / emmu_gbc / emmu_gb / emmu_gg / emmu_sms / emmu_ws / emmu_pce / emmu_n64
  → useAudio.js
    → audio-worklet.js
  → libraryStore.js
@@ -216,19 +234,22 @@ App.vue
 
 Worker mensagens importantes: `initialize`, `restart`, `runFrame`, `setButton`, `saveState`, `loadState`. Buffers de frame/áudio/estado são transferidos de volta.
 
+No N64, o worker carrega `public/wasm/n64/n64wasm.js` + `.wasm` + `assets.zip` e instancia o módulo Emscripten via `new Function('Module', jsText)`, isolando as variáveis internas entre inicializações. O bridge aplica patches em tempo de execução; `vendor/` nunca é editado.
+
 ### Desktop
 
 ```text
 Vue UI
- → MesenTauriClient (snes.js)
+ → (consoles comuns) MesenTauriClient (snes.js)
    → invoke("mesen_*") → platforms/desktop/src/lib.rs
      → emmu-mesen-sys → MesenCore.dylib/.so
        → dlopen(SDL2) para áudio
    → emmu-frame:// → frames BMP
    → mesen_capture_preview() → PNG para miniatura
+ → (N64) EmulationWorkerClient → mesmo worker WASM do web, dentro do WebView
 ```
 
-Comandos Tauri: `mesen_init_rom`, `mesen_run_frame`, `mesen_set_button`, `mesen_reset`, `mesen_stop`, `mesen_release`, `mesen_save_state`, `mesen_load_state`, `mesen_capture_preview`, `mesen_set_volume`, `mesen_set_p2_enabled`.
+Comandos Tauri: `mesen_init_rom`, `mesen_run_frame`, `mesen_set_button`, `mesen_reset`, `mesen_stop`, `mesen_release`, `mesen_save_state`, `mesen_load_state`, `mesen_capture_preview`, `mesen_set_volume`, `mesen_set_p2_enabled`. `mesen_init_rom` rejeita `N64` explicitamente.
 
 Notificações Mesen:
 
@@ -261,7 +282,7 @@ npm run build
 npm run build:wasm
 ```
 
-`predev` e `prebuild` já chamam `build:wasm`.
+`predev` e `prebuild` já chamam `build:wasm`. O script compila também o N64 e copia os assets para `src/wasm/n64/` e `public/wasm/n64/`.
 
 ### Rust
 
@@ -287,7 +308,7 @@ MESEN_GG_TEST_ROM="/caminho/jogo.gg" cargo test -p emmu-mesen-sys
 MESEN_WS_TEST_ROM="/caminho/jogo.ws" cargo test -p emmu-mesen-sys
 ```
 
-Use ROMs de jogo, não BIOS, para validação de UI/input.
+Use ROMs de jogo, não BIOS, para validação de UI/input. Para N64, o smoke test é pela UI: abrir `.z64`/`.n64`/`.v64` e validar vídeo, áudio, P1–P4, analógico, save/load e restart.
 
 ### Desktop
 
@@ -320,7 +341,7 @@ npm run desktop:build
    - guard de foco não pode ignorar botões.
 3. Instrumente temporariamente `Worker.prototype.postMessage` e confirme pares `pressed:true` / `pressed:false`.
 4. Se o botão chega ao worker mas o jogo não reage, o problema é no core, não na UI.
-5. Para PCE, confirme `TwoButtonGamepad`.
+5. Para PCE, confirme `TwoButtonGamepad`. Para N64, confirme `cfgLines[43]` e o hook `__n64PushControls`.
 6. **Remova toda instrumentação antes de entregar.**
 
 Padrão útil de instrumentação temporária:
@@ -386,7 +407,7 @@ Worker.prototype.postMessage = function (msg, ...rest) {
 ### 7.7 Save state corrompido
 
 1. Identifique o magic do core.
-2. Verifique se o load rejeita magic diferente.
+2. Verifique se o load rejeita magic diferente (no N64: retorno booleano + tamanho de `/savestate.gz`).
 3. Verifique `libraryStore.js` e o histórico (10 estados).
 4. A UI deve oferecer reinício limpo ou voltar à biblioteca.
 5. Não apague automaticamente o estado corrompido sem confirmação.
@@ -398,6 +419,15 @@ Worker.prototype.postMessage = function (msg, ...rest) {
 3. Confirme `coreButtonForFormat()` em `useEmulator.js`: X/Y/L/R viram U/D/L/R apenas quando `format === "WS"`.
 4. No desktop, `apply_button_to_state()` em `platforms/desktop/src/lib.rs` deve continuar mapeando U/D/L/R para os campos `u/d/l/r` do `DebugControllerState`.
 5. Se o frame vier 224×157, `WS_LCD_SHOW_ICONS_OFFSET` em `connect_ws_controllers()` foi ligado por engano.
+
+### 7.9 N64: loop não inicia, frame errado ou input morto
+
+1. `cfgLines[39] = '1'` (`disableAudioSync`) e `cfgLines[43] = '1'` (`mobileMode`) em `js/bridge.js` — obrigatórios.
+2. Confirme que `updateMobileControls()` foi reescrito para `__n64PushControls()` e que o hook foi injetado após `resetNeilButtons()`.
+3. Se o jogo aparece em 1/4 da tela após reiniciar, o restart está recriando o módulo: use `_neil_reset()` na instância existente.
+4. Se a altura da área de desenho está diferente no desktop, confirme `.game-canvas.n64-canvas { aspect-ratio: 4 / 3 }` em `style.css` e `FRAME_WIDTH/HEIGHT = 320/240`.
+5. Save state usa `/savestate.gz`, não `/savestate.sav`. `case "loadState"` no worker deve usar `await emulator.loadState(...)`.
+6. Para ver o ruído de debug, reative os logs marcados com `[debug-*]` ou defina `globalThis.__n64VerboseLogs = true`. Erros reais (`onAbort`, `callMain`, save/load) permanecem ativos.
 
 ---
 
@@ -417,6 +447,11 @@ Worker.prototype.postMessage = function (msg, ...rest) {
 | Build workspace quebrava | dev-deps de `super-sabicom`/`tetanes-core` e vendor PCE | crates fora do workspace / excluídos |
 | Botão grudava em browser embutido | `event.code === ""` | fallback para `event.key` |
 | WS rodava em câmera lenta | Swanium gera frames de ~75 Hz, UI chama a 60 Hz | acumulador de ciclos em `emmu-ws::run_frame` |
+| N64 reiniciava em um quadrante | restart recriava canvas/contexto WebGL | `_neil_reset()` na instância existente |
+| N64 com altura errada no desktop | canvas herdava `aspect-ratio: 8/7` do SNES | `.n64-canvas { aspect-ratio: 4 / 3 }` |
+| Save state N64 falhava | worker usava `/savestate.sav` | `/savestate.gz` + validação de retorno/tamanho |
+| Main loop N64 não arrancava | `config.txt` sem `disableAudioSync`/`mobileMode` | índices 39 e 43 = `1` |
+| Log N64 poluía o console | dezenas de `WebGL: INVALID_OPERATION` e logs de input | filtro `WebGL:` + logs `[debug-*]` comentados |
 
 ---
 
@@ -425,26 +460,40 @@ Worker.prototype.postMessage = function (msg, ...rest) {
 ```text
 platforms/web/ui/src/
 ├── App.vue                    # orquestração, autosave, diálogos
-├── components/Player.vue      # controles touch e ações do player
+├── components/Player.vue      # controles touch e ações do player (inclui pad analógico N64)
 ├── composables/
 │   ├── snes.js                # createEmulator + EmulationWorkerClient + MesenTauriClient
 │   ├── useEmulator.js         # facade do core; setButton; capturePreview
 │   ├── useShortcuts.js        # teclado
 │   ├── useLibrary.js          # import/filtros/progresso/saves
 │   ├── useAudio.js            # Web Audio
-│   └── useControls.js         # bindings
+│   ├── useControls.js         # bindings (Analog* para N64)
+│   └── useToast.js            # fila de toasts
 ├── stores/libraryStore.js     # IndexedDB
 ├── workers/
 │   ├── snes.worker.js         # protocolo dos cores WASM
 │   └── audio-worklet.js       # PCM
+├── style.css                  # .game-canvas.n64-canvas → aspect-ratio 4/3
 └── wasm/                      # gerado; NUNCA editar diretamente
 
-platforms/desktop/src/lib.rs   # Tauri + Mesen + frames + saves
+platforms/web/ui/public/wasm/n64/  # assets N64Wasm servidos em runtime (gerados/copiados)
+
+platforms/desktop/src/lib.rs   # Tauri + Mesen + frames + saves (rejeita N64)
 crates/emmu-mesen-sys/
 ├── src/lib.rs                 # ABI e wrappers
 ├── src/pce_palette.rs         # paleta PCE
 ├── build.rs                   # -lMesenCore
 └── scripts/build-sdl2.sh      # runtime SDL2
+
+crates/emmu-n64/
+├── README.md                  # API, config, controls, save state, restart, logs
+├── UPSTREAM.txt               # origem dos blobs vendorizados e hashes
+├── LICENSE                    # GPL-3.0-only do crate
+├── js/bridge.js               # patches Emscripten, input, save/load, filtro de logs
+├── src/lib.rs                 # constantes de frame/audio + teste 4:3
+├── src/wasm.rs                # bindings wasm-bindgen da ponte JS
+├── vendor/n64wasm/            # N64Wasm MIT (não editar)
+└── (native.rs é stub; desktop usa o WASM no WebView)
 
 crates/emmu-sms/
 ├── src/lib.rs                 # fachada WASM, config SMS, input, save state
@@ -484,7 +533,7 @@ Se pedirem para adicionar outro sistema, não comece pelo worker. Siga esta chec
 4. Adicionar extensão em `App.vue` e mapping em `snes.js::createEmulator`.
 5. Adicionar import e cases em `snes.worker.js`.
 6. Adicionar detect/flag em `Player.vue` para controles touch.
-7. Adicionar mapping em `platforms/desktop/src/lib.rs::mesen_init_rom`, se o Mesen suportar o console.
+7. Adicionar mapping em `platforms/desktop/src/lib.rs::mesen_init_rom`, se o Mesen suportar o console — se não suportar, rejeite explicitamente e documente o caminho alternativo (como o N64).
 8. Atualizar `HelpDialog.vue`, `README.md`, `AGENTS.md` e tabela de licenças.
 9. Definir magic de save state e política de histórico.
 10. Rodar `npm run build`, `cargo check --workspace` e `cargo tauri build` se desktop mudou.
@@ -496,39 +545,37 @@ Se pedirem para adicionar outro sistema, não comece pelo worker. Siga esta chec
 - Todos os crates e plataformas são submódulos. Commits feitos dentro deles **não** atualizam o repositório principal automaticamente.
 - Fluxo correto:
   ```sh
-  cd crates/emmu-pce
+  cd crates/emmu-n64
   git add -A
   git commit -m "..."
   cd ../..
-  git add crates/emmu-pce
-  git commit -m "Atualiza gitlink do emmu-pce"
+  git add crates/emmu-n64
+  git commit -m "Atualiza gitlink do emmu-n64"
   ```
-- Não edite diretamente `js/bridge.js`, `dist/`, `runtime/`, `runtime-link/` ou `src/wasm/`.
+- Não edite diretamente `js/bridge.js` do GBA, `dist/`, `runtime/`, `runtime-link/`, `src/wasm/` ou `public/wasm/`.
 - `runtime/` e `runtime-link/` são gerados e ignorados.
-- `src/wasm/` é gerado e ignorado; `dist/` é saída de build.
-- `crates/emmu-ws` ainda é um diretório normal no repositório principal (sem remote/submódulo); toda a dependência de emulação fica dentro dele, em `vendor/swanian-core`.
-- `crates/emmu-pce/vendor/jgenesis`, `crates/emmu-gg/vendor/jgenesis`, `crates/emmu-sms/vendor/jgenesis` e `crates/emmu-ws/vendor/swanian-core` **não** são submódulos: são códigos vendorizados dentro dos respectivos cores.
+- `src/wasm/` é gerado e ignorado; `dist/` é saída de build. `public/wasm/n64/` contém assets copiados do vendor do core.
+- `crates/emmu-ws` ainda é um diretório normal no repositório principal (sem remote/submódulo).
+- `crates/emmu-n64/vendor/n64wasm`, `crates/emmu-pce/vendor/jgenesis`, `crates/emmu-gg/vendor/jgenesis`, `crates/emmu-sms/vendor/jgenesis` e `crates/emmu-ws/vendor/swanian-core` **não** são submódulos: são códigos vendorizados dentro dos respectivos cores.
 - `crates/emmu-gba/vendor/web-gba-emulator` e `crates/emmu-mesen-sys/vendor/SDL` são submódulos de terceiros; evite commits locais neles.
-- `crates/tetanes-core`, `crates/emmu-super-sabicom` e `crates/emmu-pce/vendor` são excluídos do workspace por razões de build.
+- `crates/tetanes-core`, `crates/emmu-super-sabicom` e `crates/emmu-pce/vendor` são excluídos do workspace por razões de build. `crates/emmu-n64/vendor` também é excluído.
 
 ### Estado atual
 
-- `crates/emmu-gg` é submodule de `EspetoRx/emmu-gg` @ `081ee8e`, já publicado.
-- `crates/emmu-sms` é submodule de `EspetoRx/emmu-sms` @ `d55bd69`, publicado nesta implementação.
-- `crates/emmu-ws` foi adicionado como código local (Swanium MIT, @ `021d61d`); decida o remote antes de transformá-lo em submodule.
-- A integração de UI/desktop do GG e do SMS foi commitada e pushed em `emmu-web` e `emmu-desktop`; os gitlinks ainda precisam ser atualizados no repositório principal.
-- O repositório principal não foi pushed.
-- `emmu-gb` e `emmu-pce` também têm commits locais; confirme se os remotos existem antes de `git push`.
+- `crates/emmu-gg` @ `c807bc1`, `crates/emmu-sms` @ `d55bd69`, `crates/emmu-n64` @ `c066186` são submódulos publicados.
+- `crates/emmu-ws` foi adicionado como código local (Swanium MIT); decida o remote antes de transformá-lo em submodule.
+- A integração de UI/desktop do GG, SMS e N64 foi commitada nos submódulos correspondentes; os gitlinks são atualizados neste commit do repositório principal.
+- Não faça push no repositório principal sem confirmação explícita (a solicitação atual autoriza o push).
 
 ---
 
 ## 12. O que NÃO fazer
 
-- Não usar Mesen no web nem WASM no desktop.
+- Não usar Mesen no web nem WASM no desktop — **exceto N64**, que usa WASM no WebView dos dois.
 - Não trocar `TwoButtonGamepad` por 6 botões no PCE “para expor X/Y”.
 - Não remover o acumulador de ciclos do `emmu-ws` nem “corrigir” a taxa de áudio para 19 kHz: o Swanium roda a ~75 Hz e o acumulador converte para os 60 Hz da UI.
 - Não tratar X/Y/L/R do WonderSwan como botões de face/shoulder: eles são o segundo direcional.
-- Não editar arquivos gerados.
+- Não editar arquivos gerados (incluindo `public/wasm/n64/`).
 - Não committar `node_modules`, `dist`, `runtime`, `runtime-link` ou WASM gerado.
 - Não usar `canvas.toBlob()` para miniatura desktop.
 - Não passar frames por `invoke` como array de bytes.
@@ -536,7 +583,9 @@ Se pedirem para adicionar outro sistema, não comece pelo worker. Siga esta chec
 - Não apagar save states corrompidos sem confirmação.
 - Não assumir que `event.code` existe.
 - Não rodar `git push` sem confirmação explícita.
-- Não esquecer de atualizar licenças ao introduzir código de terceiros.
+- Não esquecer de atualizar licenças ao introduzir código de terceiros (N64Wasm é MIT, com `UPSTREAM.txt`).
+- Não recriar o módulo Emscripten no restart do N64: use `_neil_reset()`.
+- Não editar `crates/emmu-n64/vendor/`; patches são aplicados em `js/bridge.js`.
 
 ---
 
@@ -566,7 +615,7 @@ npm run build
 
 Para mudanças em save state:
 
-- magic/version atualizado;
+- magic/version atualizado (ou validação de gzip no N64);
 - teste de round-trip;
 - teste de rejeição de estado inválido;
 - histórico e recuperação na UI revisados.
@@ -577,7 +626,8 @@ Para mudanças em input:
 - `blur` libera tudo;
 - teste em ROM de jogo real;
 - instrumentação removida;
-- no WS, primeiro e segundo direcionais testados (web e desktop).
+- no WS, primeiro e segundo direcionais testados (web e desktop);
+- no N64, analógico testado no web e no desktop.
 
 Para mudanças em licenças/vendor:
 
@@ -604,4 +654,4 @@ DEBUG REPORT curto é melhor que suposição longa.
 
 ## 15. Frase final para agentes
 
-> Mude o menor arquivo possível, no backend correto, com o rebuild correto, preservando licenças e formatos de save. Se o problema é de input, prove o evento. Se é de frame, prove o protocolo. Se é de core, prove com ROM real.
+> Mude o menor arquivo possível, no backend correto, com o rebuild correto, preservando licenças e formatos de save. Se o problema é de input, prove o evento. Se é de frame, prove o protocolo. Se é de core, prove com ROM real. No N64, prove também o hook do Emscripten e o `_neil_reset`.

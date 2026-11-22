@@ -2,7 +2,7 @@
 
 > Uma biblioteca de jogos e um emulador multiplataforma, com uma única interface para navegador, desktop e dispositivos móveis.
 
-O Emmu reúne núcleos de emulação de consoles clássicos atrás de uma interface Vue 3. No **navegador**, cada sistema roda em WebAssembly dentro de um Web Worker, com áudio via Web Audio. No **desktop**, os mesmos formatos são executados pelo núcleo nativo **MesenCE**, integrado por FFI e empacotado com SDL2. A biblioteca, as miniaturas e os save states ficam no IndexedDB; nada de ROM é distribuído com o projeto.
+O Emmu reúne núcleos de emulação de consoles clássicos atrás de uma interface Vue 3. No **navegador**, cada sistema roda em WebAssembly dentro de um Web Worker, com áudio via Web Audio. No **desktop**, os mesmos formatos são executados pelo núcleo nativo **MesenCE**, integrado por FFI e empacotado com SDL2 — com exceção do **Nintendo 64**, que roda o mesmo módulo WASM dentro do WebView porque o MesenCE não implementa esse console. A biblioteca, as miniaturas e os save states ficam no IndexedDB; nada de ROM é distribuído com o projeto.
 
 ---
 
@@ -28,12 +28,12 @@ O Emmu reúne núcleos de emulação de consoles clássicos atrás de uma interf
 | Camada | Tecnologia | Papel |
 | --- | --- | --- |
 | Interface | Vue 3 + Vite 6 | Biblioteca, player, controles, save states, filtros e diálogos |
-| Navegador | Web Workers + WebAssembly | Executa os seis núcleos WASM fora da thread de UI |
+| Navegador | Web Workers + WebAssembly | Executa os dez núcleos WASM fora da thread de UI |
 | Desktop | Tauri 2 + Rust | Integra o MesenCE, áudio SDL, menu nativo e protocolo de frames |
 | Persistência | IndexedDB + `localStorage` | ROMs, save states, miniaturas, filtros e controles |
 | Cores | Rust/JS vendorizado | Cada console tem um crate isolado, com dependências dentro da própria pasta |
 
-A mesma UI atende web e desktop. A troca de backend acontece em `createEmulator()`: com Tauri, instancia-se `MesenTauriClient`; sem Tauri, cria-se o cliente do Web Worker.
+A mesma UI atende web e desktop. A troca de backend acontece em `createEmulator()`: com Tauri, instancia-se `MesenTauriClient`; sem Tauri, cria-se o cliente do Web Worker. N64 é a exceção — `createEmulator()` sempre cria o cliente do Web Worker, inclusive no desktop.
 
 ---
 
@@ -50,6 +50,7 @@ A mesma UI atende web e desktop. A troca de backend acontece em `createEmulator(
 | Sega Master System | `.sms` | `emmu-sms` → JGenesis `smsgg-core` | MesenCE (`MasterSystem`) | `EMMUSMS1` / `.mss` |
 | WonderSwan / WonderSwan Color | `.ws`, `.wsc` | `emmu-ws` → Swanium | MesenCE (`Auto` Mono/Color) | `EMMUWS01` / `.mss` |
 | PC Engine / TurboGrafx-16 | `.pce` | `emmu-pce` → JGenesis `pce-core` | MesenCE (`TurboGrafx`) | `EMMUPCE1` / `.mss` |
+| Nintendo 64 | `.z64`, `.n64`, `.v64` | `emmu-n64` → N64Wasm (mupen64plus) | WASM no WebView (sem Mesen) | gzip `/savestate.gz` |
 
 Detalhes importantes:
 
@@ -59,6 +60,7 @@ Detalhes importantes:
 - **PC Engine** usa HuCard (`.pce`); não há suporte a jogos de CD-ROM.
 - O PCE web usa gamepad de **2 botões** (I/II). O modo 6 botões alternava o estado extra em cada transição de `CLR` e fazia as setas pararem de responder em vários jogos.
 - O PCE web gera frames RGBA8888 de **282×242**; o desktop/Mesen publica **256×242**.
+- **Nintendo 64** mantém os quatro jogadores no frontend, mas o N64Wasm envia botões e analógico sempre ao Jogador 1. O analógico tem quatro ações mapeáveis (`Analógico ↑/↓/←/→`) e um pad compacto na interface touch. O frame é **320×240 (4:3)** no web e no desktop.
 - O GBA web exige o `tools/build-bridge.mjs` para concatenar o core JavaScript antes do `wasm-pack`.
 - SNES com chips de melhoria (Super FX, SA-1 e outros) não é suportado pelo Super Sabicom.
 - Nenhuma BIOS ou ROM de jogo é incluída. A BIOS open-source do GBA usada pelo Mesen vem de `Cult-of-GBA/BIOS`.
@@ -71,6 +73,7 @@ Detalhes importantes:
 - **Overlay de carregamento:** mostra progresso real (`x de y jogos`), barra e porcentagem enquanto o IndexedDB é percorrido com cursor.
 - **Save states:** checkpoint automático a cada 5 segundos, ao voltar para a biblioteca, ao background e ao desmontar o player. Save manual entra no histórico; os 10 estados anteriores ficam disponíveis em **Histórico**.
 - **Recuperação:** estado corrompido oferece reinício limpo ou retorno à biblioteca para escolher outro save.
+- **Alertas:** fila de toasts com 10 segundos de duração, pausa ao passar o mouse, barra de progresso, botão de fechar e dedupe de mensagens idênticas.
 - **Controles configuráveis:** teclado e toque, com `pointerdown/up/cancel/leave`, `preventDefault()` e liberação de todas as teclas quando a janela perde foco.
 - **Áudio:** fila PCM limitada com `AudioWorklet` e fallback para `createBufferSource`. No desktop, o volume também é repassado ao Mesen/SDL.
 - **Filtros da biblioteca:** busca sem acento, ordenação e agrupamento por título similar, console, formato e existência de save. Não é filtro de vídeo.
@@ -93,11 +96,14 @@ App.vue
        │                                            ├─ emmu_gbc.wasm
        │                                            ├─ emmu_gb.wasm
        │                                            ├─ emmu_gg.wasm
-       │                                            └─ emmu_pce.wasm
+       │                                            ├─ emmu_sms.wasm
+       │                                            ├─ emmu_ws.wasm
+       │                                            ├─ emmu_pce.wasm
+       │                                            └─ emmu_n64.wasm + n64wasm.js/.wasm/assets.zip
        └─ useAudio.js ── audio-worklet.js
 ```
 
-O worker recebe `initialize`, `restart`, `runFrame`, `setButton`, `saveState` e `loadState`, e transfere buffers de frame/áudio/estado de volta para a UI.
+O worker recebe `initialize`, `restart`, `runFrame`, `setButton`, `saveState` e `loadState`, e transfere buffers de frame/áudio/estado de volta para a UI. O N64 carrega o runtime Emscripten vendorizado em `public/wasm/n64/` e o injeta no worker.
 
 ### Desktop
 
@@ -110,7 +116,7 @@ Vue UI
        └─ emmu-frame://localhost/frame?n=<nonce>  →  frames BMP gerados no Rust
 ```
 
-O Mesen é inicializado em modo headless. Os frames chegam pelas notificações `PPU_FRAME_DONE` (NES) e `REFRESH_SOFTWARE_RENDERER` (SNES/GBA/GB/GBC/GG/SMS/WS/PCE). Save states são gravados em arquivos `.mss` temporários e devolvidos à UI como bytes para o IndexedDB.
+O Mesen é inicializado em modo headless. Os frames chegam pelas notificações `PPU_FRAME_DONE` (NES) e `REFRESH_SOFTWARE_RENDERER` (SNES/GBA/GB/GBC/GG/SMS/WS/PCE). Save states são gravados em arquivos `.mss` temporários e devolvidos à UI como bytes para o IndexedDB. O N64 não passa por esta camada: `mesen_init_rom()` rejeita `N64` explicitamente e a UI usa o worker WASM no WebView, com save state em `/savestate.gz`.
 
 ### Persistência
 
@@ -349,7 +355,7 @@ cargo fmt --all -- --check
 cargo check --workspace
 
 # Testes dos núcleos e do desktop
-cargo test -p emmu-gg -p emmu-sms -p emmu-ws -p emmu-pce -p emmu-gb -p emmu-gbc -p emmu-mesen-sys -p desktop
+cargo test -p emmu-gg -p emmu-sms -p emmu-ws -p emmu-pce -p emmu-gb -p emmu-gbc -p emmu-n64 -p emmu-mesen-sys -p desktop
 
 # Testes com ROM real (opcionais)
 EMMU_NES_TEST_ROM="/caminho/jogo.nes" cargo test -p emmu-nes
@@ -390,6 +396,7 @@ cargo run -p emmu-snes --example snes_smoke -- Jogo.sfc
 | `crates/emmu-sms` | `EspetoRx/emmu-sms` @ `d55bd69` | core Sega Master System | GPL-3.0-only |
 | `crates/emmu-ws` | diretório local (ainda sem submódulo/remote) | core WonderSwan via Swanium | MIT |
 | `crates/emmu-pce` | `EspetoRx/emmu-pce` @ `e8a9860` | core PC Engine | GPL-3.0-only |
+| `crates/emmu-n64` | `EspetoRx/emmu-n64` @ `c066186` | core Nintendo 64 via N64Wasm | GPL-3.0-only (+ MIT no vendor) |
 | `crates/emmu-mesen-sys` | `EspetoRx/emmu-mesen-sys` @ `46dab68` | FFI Mesen + runtime | sem campo declarado |
 | `crates/emmu-super-sabicom` | `EspetoRx/emmu-super-sabicom` @ `a7b80ad` | core SNES | MIT |
 | `crates/tetanes-core` | `EspetoRx/tetanes-core` @ `e27c108` | core NES | MIT OR Apache-2.0 |
@@ -419,6 +426,8 @@ Este projeto combina código próprio e software de terceiros. Respeite cada lic
 | `emmu-sms` e JGenesis `smsgg-core` | GPL-3.0-only | `jsgroth/jgenesis`, commit `8d1bdfba...`; subset SMS/GG com hardware forçado para Master System |
 | `emmu-ws` e Swanium | MIT | `bubio/Swanium` @ `021d61d`; `Copyright (c) 2026 bubio`; subset `crates/core` vendorizado |
 | `emmu-pce` e JGenesis `pce-core` | GPL-3.0-only | `jsgroth/jgenesis`, commit `8d1bdfba...`; subset HuCard |
+| `emmu-n64` | GPL-3.0-only | código Emmu sob `LICENSE`; wrapper/fachada WASM para N64Wasm |
+| N64Wasm | MIT | `nbarkhina/N64Wasm` @ `3056c89d` (2024-11-12); `Copyright (c) 2021 Neil Barkhina`; mupen64plus + ParaLLEl-RDP compilados para WebAssembly |
 | Web-GBA / gbajs | BSD-2-Clause | `Copyright (c) 2012, Jeffrey Pfau`; adaptação web por `alexcerezo` |
 | MesenCE / Mesen 2 | GPL-3.0 | `Copyright (C) 2014-2025 Sour`; binário externo, distribuído via `runtime/` |
 | SDL2 2.32.10 | zlib | `Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>` |
@@ -453,6 +462,9 @@ crates/emmu-ws/vendor/swanian-core/LICENSE
 crates/emmu-pce/LICENSE
 crates/emmu-pce/UPSTREAM.txt
 crates/emmu-pce/vendor/jgenesis/LICENSE
+crates/emmu-n64/LICENSE
+crates/emmu-n64/UPSTREAM.txt
+crates/emmu-n64/vendor/n64wasm/LICENSE
 crates/emmu-super-sabicom/LICENSE
 crates/tetanes-core/LICENSE-MIT
 crates/tetanes-core/LICENSE-APACHE
@@ -472,6 +484,7 @@ crates/emmu-mesen-sys/runtime/LICENSE-SDL2.txt   # gerado pelo script
 - O usuário deve possuir ou obter legalmente as ROMs que importa.
 - A BIOS GBA incluída é a implementação open-source do projeto `Cult-of-GBA/BIOS`, sob MIT; Mesen a instala em `<home>/Firmware/gba_bios.bin` quando não há arquivo de mesmo tamanho.
 - O PC Engine implementa apenas HuCard; System Cards e jogos de CD-ROM não são suportados.
+- O Nintendo 64 usa o mesmo WASM no web e no desktop. O backend Mesen rejeita `N64` explicitamente. O save state é um gzip gerado pelo core; o histórico é mantido pelo Emmu.
 - Nomes de consoles e jogos pertencem aos respectivos proprietários.
 
 ---
@@ -492,6 +505,10 @@ crates/emmu-mesen-sys/runtime/LICENSE-SDL2.txt   # gerado pelo script
 | Miniatura não salva no desktop | canvas tainted por `emmu-frame://` | use `mesen_capture_preview()` (PNG gerado no Rust) |
 | `EXC_BAD_ACCESS` ao sair | chamada FFI após `Release()` | mantenha o guard de shutdown de `emmu-mesen-sys` |
 | Build desktop no Windows falha | `build.rs` espera `.dylib`/`.so` | use macOS/Linux ou adicione suporte a `.dll` |
+| N64 abre com erro “não suportado no backend desktop nativo” | console enviado ao Mesen | `createEmulator()` deve usar o worker WASM para N64 também sob Tauri |
+| Main loop do N64 não inicia / tela preta | `config.txt` sem `disableAudioSync`/`mobileMode` | índices 39 e 43 devem ser `1` no `js/bridge.js` |
+| Frame N64 em um quadrante ou com altura diferente no desktop | canvas trocado no restart ou proporção errada | use `_neil_reset()` e `aspect-ratio: 4 / 3` (`.n64-canvas`) |
+| Analógico N64 não responde | hook de input ausente ou `mobileMode` desligado | confirme `__n64PushControls()` e `cfgLines[43] = '1'` |
 
 ---
 
@@ -504,5 +521,9 @@ Agentes de IA e assistentes de código devem ler [`AGENTS.md`](AGENTS.md) antes 
 3. Para mudanças na UI, rode `npm run build` em `platforms/web/ui`.
 4. Commite no submódulo e depois atualize o gitlink no repositório principal.
 5. Documente mudanças de ABI, formato de save state e licenças de código vendorizado.
+
+## Versionamento
+
+O Emmu segue versionamento semântico. A versão atual da interface é `0.2.0`, registrada em `platforms/web/ui/package.json` e `package-lock.json`. O suporte a Nintendo 64 entra nesta versão.
 
 Bons jogos — e lembre-se de preservar os créditos e as licenças de cada núcleo.
