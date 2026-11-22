@@ -21,7 +21,7 @@
       "env": {
         "RUST_BACKTRACE": "1",
         "RUST_LOG": "info",
-        "DYLD_LIBRARY_PATH": "/tmp/MesenCE/InteropDLL/obj.osx-arm64"
+        "DYLD_LIBRARY_PATH": "${workspaceFolder}/crates/emmu-mesen-sys/runtime"
       },
       // O AudioToolbox (SDL) lança exceções C++ internas ao trocar o device de
       // áudio. O CodeLLDB persiste "C++: on throw" entre sessões e pausa nelas.
