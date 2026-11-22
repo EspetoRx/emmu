@@ -29,6 +29,9 @@ exclude = [
     "crates/emmu-sms/vendor",
     "crates/emmu-ws/vendor",
     "crates/emmu-n64/vendor",
+    # O core NDS usa toolchain noturna própria e workspace isolado (vendor/dust).
+    # Rode cargo check/test dentro de crates/emmu-nds, não pelo workspace raiz.
+    "crates/emmu-nds",
 ]
 resolver = "2"
 

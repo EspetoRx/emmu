@@ -7,7 +7,7 @@
 
 Antes de alterar código, responda mentalmente a três perguntas:
 
-1. **O problema é no web, no desktop ou nos dois?** Os backends são diferentes — e o N64 é diferente dos dois.
+1. **O problema é no web, no desktop ou nos dois?** Os backends são diferentes — e N64 e NDS são diferentes dos dois.
 2. **Qual core está envolvido?** Cada console tem um crate, um WASM e um caminho Mesen próprios.
 3. **A mudança precisa de rebuild de WASM, bridge JS, runtime Mesen/SDL ou gitlink de submódulo?**
 
@@ -20,17 +20,17 @@ Se não souber a resposta, pergunte ao usuário **qual ROM, qual plataforma e qu
 | Item | Fato |
 | --- | --- |
 | UI | Vue 3 + Vite 6 em `platforms/web/ui`, compartilhada por web, Tauri desktop e scripts mobile |
-| Web | Web Worker (`snes.worker.js`) + dez pacotes WASM gerados por `wasm-pack` |
-| Desktop | Tauri 2 + Rust; emulação via MesenCE (`emmu-mesen-sys`), **exceto N64**, que roda o mesmo WASM no WebView |
-| Consoles | NES, SNES, GBA, GB, GBC, GG, SMS, WS/WSC, PCE e N64 |
+| Web | Web Worker (`snes.worker.js`) + onze pacotes WASM gerados por `wasm-pack` |
+| Desktop | Tauri 2 + Rust; emulação via MesenCE (`emmu-mesen-sys`), **exceto N64 e NDS**, que rodam o mesmo WASM no WebView |
+| Consoles | NES, SNES, GBA, GB, GBC, GG, SMS, WS/WSC, PCE, NDS e N64 |
 | Persistência | IndexedDB `emmu-library` v2; `localStorage` para filtros e controles |
-| Save states | `EMMUGMB1`, `EMMUGBC1`, `EMMUGG01`, `EMMUSMS1`, `EMMUWS01`, `EMMUPCE1`, `EMMUSAVE1`, bincode/TetaNES no web; `.mss` no desktop; gzip `/savestate.gz` no N64 |
-| Frames web | RGBA8888 via `putImageData` |
+| Save states | `EMMUGMB1`, `EMMUGBC1`, `EMMUGG01`, `EMMUSMS1`, `EMMUWS01`, `EMMUPCE1`, `EMMUSAVE1`, `EMMUNDS1`, bincode/TetaNES no web; `.mss` no desktop; gzip `/savestate.gz` no N64 |
+| Frames web | RGBA8888 via `putImageData` (NDS empilha 256×192 + 256×192 em 256×384) |
 | Frames desktop | BMP 24-bit via protocolo `emmu-frame://`; miniatura via PNG gerado no Rust |
-| Cores GPL | GB, GBC, GG, SMS e PCE no web; Mesen no desktop; N64 (Emmu) |
+| Cores GPL | GB, GBC, GG, SMS, PCE e NDS (dust) no web; Mesen no desktop; N64 (Emmu) |
 | Cores MIT/permisivos | NES, SNES, GBA e WS (Swanium) no web; N64Wasm (vendor, MIT) |
-| Submódulos | Todos os crates e plataformas antigos são submódulos; `crates/emmu-ws` é diretório local até receber remote; `crates/emmu-n64` é submodule de `EspetoRx/emmu-n64` |
-| Versão UI | `0.2.0` — inclui N64, toasts e analógico |
+| Submódulos | Todos os crates e plataformas antigos são submódulos; `crates/emmu-ws` é diretório local até receber remote; `crates/emmu-n64` e `crates/emmu-nds` são submódulos de `EspetoRx` |
+| Versão UI | `0.2.0` — inclui NDS, N64, toasts e analógico |
 
 ---
 
@@ -45,7 +45,7 @@ Para entender o projeto rapidamente, nesta ordem:
 5. `platforms/web/ui/src/workers/snes.worker.js` — protocolo do worker.
 6. `platforms/desktop/src/lib.rs` — comandos Tauri, frames, save states e menu.
 7. `crates/emmu-mesen-sys/src/lib.rs` — ABI e wrappers do Mesen.
-8. O `README.md` do core específico envolvido no bug (para N64, `crates/emmu-n64/README.md` e `UPSTREAM.txt`).
+8. O `README.md` do core específico envolvido no bug (para N64, `crates/emmu-n64/README.md` e `UPSTREAM.txt`; para NDS, `crates/emmu-nds/README.md` e `UPSTREAM.txt`).
 
 ---
 
@@ -75,7 +75,7 @@ Para entender o projeto rapidamente, nesta ordem:
 | Build WASM desatualizado | `platforms/web/ui/package.json` (`build:wasm`) | diretório `src/wasm/` |
 | Erro de link Mesen | `crates/emmu-mesen-sys/build.rs` | `scripts/build-sdl2.sh` |
 | Gitlink sujo | submódulo específico | repositório principal |
-| Instalador sem SDL2/Mesen/N64Wasm | `resources` ou runtime não preparado | `platforms/desktop/scripts/prepare-bundle.sh` + `tauri.conf.json` (`bundle.resources`) |
+| Instalador sem SDL2/Mesen/N64Wasm/licença dust | `resources` ou runtime não preparado | `platforms/desktop/scripts/prepare-bundle.sh` + `tauri.conf.json` (`bundle.resources`) |
 | Instalador com core faltando | `dist/` incompleto | `platforms/web/ui/scripts/check-bundle-assets.mjs` (`postbuild`) |
 | **N64 não inicia / tela preta / loop não arranca** | `crates/emmu-n64/js/bridge.js` (`cfgLines[39]`, `cfgLines[43]`) | `crates/emmu-n64/README.md` |
 | **N64 reinicia em 1/4 da tela** | `crates/emmu-n64/js/bridge.js` (`_neil_reset`) | `snes.worker.js` (`case "restart"` N64) |
@@ -83,6 +83,10 @@ Para entender o projeto rapidamente, nesta ordem:
 | **Analógico N64 não responde** | `crates/emmu-n64/js/bridge.js` (`__n64PushControls`) | `useControls.js` (`Analog*`) / `useEmulator.js::coreButtonForFormat` |
 | **Save state N64 falha** | `crates/emmu-n64/js/bridge.js` (`/savestate.gz`) | `snes.worker.js` (`case "saveState"/"loadState"`) |
 | **Console N64 no desktop** | `platforms/desktop/src/lib.rs` (`mesen_init_rom` rejeita) | `snes.js` (`createEmulator` nunca usa Mesen para N64) |
+| **NDS tela achatada / toque fora de lugar** | `platforms/web/ui/src/style.css` (`.nds-canvas`, `2 / 3` + limite de largura) | `Player.vue::ndsTouchPoint` |
+| **Painel sensível NDS não responde** | `Player.vue` (`set-touch`/`end-touch` no canvas) | `snes.worker.js` (`setTouch`/`endTouch`) |
+| **Save state NDS falha** | `crates/emmu-nds/src/wasm.rs` (`EMMUNDS1` + u32) | `snes.worker.js` (`saveState`/`loadState`) |
+| **NDS não inicia no desktop** | `snes.js` (`createEmulator` deve usar Worker) | `platforms/desktop/src/lib.rs` (`mesen_init_rom` rejeita NDS) |
 
 ---
 
@@ -96,8 +100,9 @@ Não quebre estes contratos sem uma razão explícita e testes.
   - com Tauri → `MesenTauriClient`;
   - sem Tauri → `EmulationWorkerClient`;
   - **`N64` → sempre `EmulationWorkerClient`, inclusive no desktop** (Mesen não implementa N64).
-- No desktop, **todos os consoles exceto N64** usam Mesen. Nenhum WASM é usado no desktop fora do WebView do N64.
-- No web, NES/SNES/GBA/GB/GBC/GG/SMS/WS/PCE/N64 usam cores separados, todos via Worker.
+  - **`NDS` → sempre `EmulationWorkerClient`, inclusive no desktop** (Mesen não implementa NDS).
+- No desktop, **todos os consoles exceto N64 e NDS** usam Mesen. Nenhum WASM é usado no desktop fora do WebView desses dois consoles.
+- No web, NES/SNES/GBA/GB/GBC/GG/SMS/WS/PCE/NDS/N64 usam cores separados, todos via Worker.
 
 ### 4.2 Extensões e formatos
 
@@ -112,10 +117,11 @@ Não quebre estes contratos sem uma razão explícita e testes.
 .gba  → GBA
 .nes  → NES
 .sfc/.smc/.fig → SNES
+.nds  → NDS
 .z64/.n64/.v64 → N64
 ```
 
-ZIPs são expandidos antes da importação; somente entradas `.gg`, `.sms`, `.ws` e `.wsc` são extraídas. `.wsc` é normalizado para o formato lógico `WS`.
+ZIPs são expandidos antes da importação; somente entradas `.gg`, `.sms`, `.ws`, `.wsc`, `.nds`, `.z64`, `.n64` e `.v64` são extraídas. `.wsc` é normalizado para o formato lógico `WS`. ROMs NDSi Enhanced podem passar de 256 MiB, então o limite dentro de ZIP é 512 MiB (`MAX_NDS_ROM_BYTES`).
 
 Qualquer valor diferente cai em `SNES` no `createEmulator`. Isso é intencional como fallback, mas pode mascarar bugs de extensão.
 
@@ -132,10 +138,11 @@ Qualquer valor diferente cai em `SNES` no `createEmulator`. Isso é intencional 
 | GBA web | `EMMUSAVE1` |
 | SNES web | bincode do Super Sabicom |
 | NES web | serialização do TetaNES |
+| **NDS web/desktop** | `EMMUNDS1` + `u32` LE version + estado do `PersistentWriteSavestate` do dust |
 | **N64 web/desktop** | gzip criado pelo core em `/savestate.gz` (`_neil_serialize` / `_neil_unserialize`) |
 | Desktop | arquivos `.mss` do Mesen |
 
-Ao mudar um formato, **troque o magic/version** e ofereça caminho de recuperação. Nunca faça load silencioso de estado incompatível. No N64 não há magic: o bridge valida o retorno booleano e o tamanho do arquivo.
+Ao mudar um formato, **troque o magic/version** e ofereça caminho de recuperação. Nunca faça load silencioso de estado incompatível. No N64 não há magic: o bridge valida o retorno booleano e o tamanho do arquivo. No NDS, o load rejeita magic ou versão diferentes; a versão atual é `1`.
 
 ### 4.4 Frames
 
@@ -234,9 +241,11 @@ App.vue
    → IndexedDB
 ```
 
-Worker mensagens importantes: `initialize`, `restart`, `runFrame`, `setButton`, `saveState`, `loadState`. Buffers de frame/áudio/estado são transferidos de volta.
+Worker mensagens importantes: `initialize`, `restart`, `runFrame`, `setButton`, `setTouch`, `endTouch`, `setVolume`, `saveState`, `loadState`. Buffers de frame/áudio/estado são transferidos de volta.
 
 No N64, o worker carrega `public/wasm/n64/n64wasm.js` + `.wasm` + `assets.zip` e instancia o módulo Emscripten via `new Function('Module', jsText)`, isolando as variáveis internas entre inicializações. O bridge aplica patches em tempo de execução; `vendor/` nunca é editado.
+
+No NDS, o worker importa `src/wasm/nds/adapter.js`, que usa o módulo `wasm-pack` de `src/wasm/nds/emmu_nds.js`. O áudio nativo do `dust` é **32768 Hz**: `AUDIO_SAMPLE_RATE` no crate e `AUDIO_RATE` no adapter precisam permanecer iguais. Anunciar 44100 Hz faz o worklet drenar a fila 35% mais rápido, com tom agudo e underruns.
 
 ### Desktop
 
@@ -248,10 +257,10 @@ Vue UI
        → dlopen(SDL2) para áudio
    → emmu-frame:// → frames BMP
    → mesen_capture_preview() → PNG para miniatura
- → (N64) EmulationWorkerClient → mesmo worker WASM do web, dentro do WebView
+ → (N64, NDS) EmulationWorkerClient → mesmo worker WASM do web, dentro do WebView
 ```
 
-Comandos Tauri: `mesen_init_rom`, `mesen_run_frame`, `mesen_set_button`, `mesen_reset`, `mesen_stop`, `mesen_release`, `mesen_save_state`, `mesen_load_state`, `mesen_capture_preview`, `mesen_set_volume`, `mesen_set_p2_enabled`. `mesen_init_rom` rejeita `N64` explicitamente.
+Comandos Tauri: `mesen_init_rom`, `mesen_run_frame`, `mesen_set_button`, `mesen_reset`, `mesen_stop`, `mesen_release`, `mesen_save_state`, `mesen_load_state`, `mesen_capture_preview`, `mesen_set_volume`, `mesen_set_p2_enabled`. `mesen_init_rom` rejeita `N64` e `NDS` explicitamente.
 
 Notificações Mesen:
 
