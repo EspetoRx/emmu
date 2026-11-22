@@ -11,6 +11,7 @@ members = [
     "crates/emmu-ws",
     "crates/emmu-pce",
     "crates/emmu-n64",
+    "crates/emmu-psp",
     "crates/emmu-frontend",
     "crates/emmu-mesen-sys",
     "platforms/desktop",

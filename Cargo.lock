@@ -1112,6 +1112,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "emmu-psp"
+version = "0.1.0"
+
+[[package]]
 name = "emmu-sms"
 version = "0.1.0"
 dependencies = [

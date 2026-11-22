@@ -2,7 +2,7 @@
 
 > Uma biblioteca de jogos e um emulador multiplataforma, com uma única interface para navegador, desktop e dispositivos móveis.
 
-O Emmu reúne núcleos de emulação de consoles clássicos atrás de uma interface Vue 3. No **navegador**, cada sistema roda em WebAssembly dentro de um Web Worker, com áudio via Web Audio. No **desktop**, os mesmos formatos são executados pelo núcleo nativo **MesenCE**, integrado por FFI e empacotado com SDL2 — com exceção do **Nintendo 64** e do **Nintendo DS**, que rodam o mesmo módulo WASM dentro do WebView porque o MesenCE não implementa esses consoles. A biblioteca, as miniaturas e os save states ficam no IndexedDB; nada de ROM é distribuído com o projeto.
+O Emmu reúne núcleos de emulação de consoles clássicos atrás de uma interface Vue 3. No **navegador**, cada sistema roda em WebAssembly dentro de um Web Worker, com áudio via Web Audio. No **desktop**, os mesmos formatos são executados pelo núcleo nativo **MesenCE**, integrado por FFI e empacotado com SDL2 — com exceção do **Nintendo 64**, do **Nintendo DS** e do **PlayStation Portable**, que rodam o mesmo módulo WASM dentro do WebView porque o MesenCE não implementa esses consoles. O PSP roda na thread principal (não no worker) porque o PPSSPP exige WebGL2 e pthreads com `SharedArrayBuffer`. A biblioteca, as miniaturas e os save states ficam no IndexedDB; nada de ROM é distribuído com o projeto.
 
 ---
 
@@ -28,12 +28,12 @@ O Emmu reúne núcleos de emulação de consoles clássicos atrás de uma interf
 | Camada | Tecnologia | Papel |
 | --- | --- | --- |
 | Interface | Vue 3 + Vite 6 | Biblioteca, player, controles, save states, filtros e diálogos |
-| Navegador | Web Workers + WebAssembly | Executa os onze núcleos WASM fora da thread de UI |
+| Navegador | Web Workers + WebAssembly | Executa onze núcleos WASM fora da thread de UI; o PSP roda na main thread com WebGL2 |
 | Desktop | Tauri 2 + Rust | Integra o MesenCE, áudio SDL, menu nativo e protocolo de frames |
 | Persistência | IndexedDB + `localStorage` | ROMs, save states, miniaturas, filtros e controles |
 | Cores | Rust/JS vendorizado | Cada console tem um crate isolado, com dependências dentro da própria pasta |
 
-A mesma UI atende web e desktop. A troca de backend acontece em `createEmulator()`: com Tauri, instancia-se `MesenTauriClient`; sem Tauri, cria-se o cliente do Web Worker. N64 e NDS são as exceções — `createEmulator()` sempre cria o cliente do Web Worker para eles, inclusive no desktop.
+A mesma UI atende web e desktop. A troca de backend acontece em `createEmulator()`: com Tauri, instancia-se `MesenTauriClient`; sem Tauri, cria-se o cliente do Web Worker. N64 e NDS são as exceções — `createEmulator()` sempre cria o cliente do Web Worker para eles, inclusive no desktop. O PSP é outra exceção: `createEmulator()` sempre cria o cliente main-thread (`PspClient`/`PspAdapter`), que roda o PPSSPP diretamente na thread de UI com WebGL2, dentro do Web Worker não há suporte a pthreads; isso vale para web e desktop.
 
 ---
 
@@ -52,6 +52,7 @@ A mesma UI atende web e desktop. A troca de backend acontece em `createEmulator(
 | PC Engine / TurboGrafx-16 | `.pce` | `emmu-pce` → JGenesis `pce-core` | MesenCE (`TurboGrafx`) | `EMMUPCE1` / `.mss` |
 | Nintendo DS | `.nds` | `emmu-nds` → dust | WASM no WebView (sem Mesen) | `EMMUNDS1` + versão u32 |
 | Nintendo 64 | `.z64`, `.n64`, `.v64` | `emmu-n64` → N64Wasm (mupen64plus) | WASM no WebView (sem Mesen) | gzip `/savestate.gz` |
+| PlayStation Portable | `.psp`, `.iso`, `.cso`, `.chd`, `.pbp`, `.elf`, `.prx` | `emmu-psp` → PPSSPP libretro (EmulatorJS) | WASM no WebView (sem Mesen) | `EMMUPSP1` + versão u32 |
 
 Detalhes importantes:
 
@@ -63,6 +64,7 @@ Detalhes importantes:
 - O PCE web gera frames RGBA8888 de **282×242**; o desktop/Mesen publica **256×242**.
 - **Nintendo DS** roda o core `dust` com BIOS HLE e firmware gerado em runtime; nenhum arquivo de sistema copyrightado é distribuído. A UI empilha as duas telas em um frame RGBA8888 de **256×384 (2:3)**. Toque ou clique na metade inferior usa o painel sensível; A/B/X/Y/L/R/Start/Select são mapeáveis e o console tem um único jogador. O save state é `EMMUNDS1` + versão `u32` + estado do core.
 - **Nintendo 64** mantém os quatro jogadores no frontend, mas o N64Wasm envia botões e analógico sempre ao Jogador 1. O analógico tem quatro ações mapeáveis (`Analógico ↑/↓/←/→`) e um pad compacto na interface touch. O frame é **320×240 (4:3)** no web e no desktop.
+- **PlayStation Portable** roda o PPSSPP libretro via adaptador Emscripten vendorizado, na thread principal do navegador/WebView (o core usa WebGL2 + pthreads e exige isolamento cross-origin: COOP/COEP + `SharedArrayBuffer`). A/B/X/Y correspondem a ×/○/□/△, com L/R, Select, Start e analógico digital (`Analógico ↑/↓/←/→`); o console tem um único jogador. O áudio é gerenciado pelo próprio core (WebAudio/OpenAL dentro do Emscripten), e o volume é aplicado diretamente nos nós de ganho. O frame é **480×272** e o save state é um envelope `EMMUPSP1` com o estado gzipado do core e um ZIP da save data. Arquivos `.zip` com uma entrada PSP também são aceitos.
 - O GBA web exige o `tools/build-bridge.mjs` para concatenar o core JavaScript antes do `wasm-pack`.
 - SNES com chips de melhoria (Super FX, SA-1 e outros) não é suportado pelo Super Sabicom.
 - Nenhuma BIOS ou ROM de jogo é incluída. A BIOS open-source do GBA usada pelo Mesen vem de `Cult-of-GBA/BIOS`.
@@ -71,13 +73,13 @@ Detalhes importantes:
 
 ## Recursos
 
-- **Biblioteca persistente:** ROMs são guardadas como blobs no IndexedDB; a abertura aceita vários arquivos de uma vez, incluindo `.zip` com ROMs `.gg`, `.sms`, `.ws` e `.wsc`. Se uma entrada antiga perder o blob, basta reimportar a mesma ROM.
+- **Biblioteca persistente:** ROMs são guardadas como blobs no IndexedDB; a abertura aceita vários arquivos de uma vez, incluindo `.zip` com ROMs `.gg`, `.sms`, `.ws`, `.wsc` e PSP. Se uma entrada antiga perder o blob, basta reimportar a mesma ROM.
 - **Overlay de carregamento:** mostra progresso real (`x de y jogos`), barra e porcentagem enquanto o IndexedDB é percorrido com cursor.
 - **Save states:** checkpoint automático a cada 5 segundos, ao voltar para a biblioteca, ao background e ao desmontar o player. Save manual entra no histórico; os 10 estados anteriores ficam disponíveis em **Histórico**.
 - **Recuperação:** estado corrompido oferece reinício limpo ou retorno à biblioteca para escolher outro save.
 - **Alertas:** fila de toasts com 10 segundos de duração, pausa ao passar o mouse, barra de progresso, botão de fechar e dedupe de mensagens idênticas.
 - **Controles configuráveis:** teclado e toque, com `pointerdown/up/cancel/leave`, `preventDefault()` e liberação de todas as teclas quando a janela perde foco.
-- **Áudio:** fila PCM limitada com `AudioWorklet` e fallback para `createBufferSource`. No desktop, o volume também é repassado ao Mesen/SDL.
+- **Áudio:** fila PCM limitada com `AudioWorklet` e fallback para `createBufferSource`. No desktop, o volume também é repassado ao Mesen/SDL. No PSP, o áudio é do próprio core (WebAudio via Emscripten/OpenAL) e o volume ajusta os nós de ganho das fontes ativas.
 - **Filtros da biblioteca:** busca sem acento, ordenação e agrupamento por título similar, console, formato e existência de save. Não é filtro de vídeo.
 - **Player:** tela cheia, reinício, volume, salvar estado, carregar estado, histórico e indicação de console.
 - **Menus nativos:** no desktop, Arquivo (abrir ROM, voltar à biblioteca, sair), Emulação (configurar controles) e Ajuda emitem eventos para a UI.
@@ -103,10 +105,11 @@ App.vue
        │                                            ├─ emmu_pce.wasm
        │                                            ├─ emmu_nds.wasm + adapter.js
        │                                            └─ emmu_n64.wasm + n64wasm.js/.wasm/assets.zip
+       ├─ PspClient (main thread) ── psp/adapter.js ─┴─ ppsspp_libretro.js/.wasm + ppsspp-assets.zip
        └─ useAudio.js ── audio-worklet.js
 ```
 
-O worker recebe `initialize`, `restart`, `runFrame`, `setButton`, `setTouch`, `endTouch`, `setVolume`, `saveState` e `loadState`, e transfere buffers de frame/áudio/estado de volta para a UI. O N64 carrega o runtime Emscripten vendorizado em `public/wasm/n64/` e o injeta no worker; o NDS importa o módulo `emmu_nds` gerado pelo `wasm-pack` diretamente pelo `adapter.js`.
+O worker recebe `initialize`, `restart`, `runFrame`, `setButton`, `setTouch`, `endTouch`, `setVolume`, `saveState` e `loadState`, e transfere buffers de frame/áudio/estado de volta para a UI. O N64 carrega o runtime Emscripten vendorizado em `public/wasm/n64/` e o injeta no worker; o NDS importa o módulo `emmu_nds` gerado pelo `wasm-pack` diretamente pelo `adapter.js`. O PSP **não** usa o worker: `PspClient`/`PspAdapter` rodam na main thread e carregam `ppsspp_libretro.js`, `ppsspp_libretro.wasm` e `ppsspp-assets.zip` de `public/wasm/psp/`, com WebGL2, pthreads e `SharedArrayBuffer` (headers COOP/COEP em dev, preview e Tauri). O adaptador expõe o mesmo contrato de `runFrame`/`setButton`/`saveState`/`loadState`/`restart`/`setVolume`/`capturePreview` dos demais cores.
 
 ### Desktop
 
@@ -119,7 +122,7 @@ Vue UI
        └─ emmu-frame://localhost/frame?n=<nonce>  →  frames BMP gerados no Rust
 ```
 
-O Mesen é inicializado em modo headless. Os frames chegam pelas notificações `PPU_FRAME_DONE` (NES) e `REFRESH_SOFTWARE_RENDERER` (SNES/GBA/GB/GBC/GG/SMS/WS/PCE). Save states são gravados em arquivos `.mss` temporários e devolvidos à UI como bytes para o IndexedDB. N64 e NDS não passam por esta camada: `mesen_init_rom()` rejeita ambos explicitamente e a UI usa o worker WASM no WebView. O save state do N64 é um gzip em `/savestate.gz`; o do NDS usa `EMMUNDS1`.
+O Mesen é inicializado em modo headless. Os frames chegam pelas notificações `PPU_FRAME_DONE` (NES) e `REFRESH_SOFTWARE_RENDERER` (SNES/GBA/GB/GBC/GG/SMS/WS/PCE). Save states são gravados em arquivos `.mss` temporários e devolvidos à UI como bytes para o IndexedDB. N64, NDS e PSP não passam por esta camada: `mesen_init_rom()` rejeita os três explicitamente. N64 e NDS usam o worker WASM no WebView; o PSP usa o `PspAdapter` na main thread do WebView (mesmo runtime do navegador). O save state do N64 é um gzip em `/savestate.gz`; o do NDS usa `EMMUNDS1`; o do PSP usa `EMMUPSP1`.
 
 ### Persistência
 
@@ -155,6 +158,13 @@ emmu/
 │   ├── emmu-ws/                    # core WonderSwan via Swanium
 │   │   └── vendor/swanian-core/    # subset do core Swanium vendorizado (MIT)
 │   ├── emmu-pce/                   # core PC Engine via JGenesis pce-core
+│   ├── emmu-n64/                   # core Nintendo 64 via N64Wasm (WASM no worker/WebView)
+│   │   └── vendor/n64wasm/         # N64Wasm MIT compilado para WASM (não editar)
+│   ├── emmu-nds/                   # core Nintendo DS via dust (WASM no worker/WebView)
+│   │   └── vendor/dust/            # dust GPL-3.0 + emu-utils/arm-decoder
+│   ├── emmu-psp/                   # core PSP via PPSSPP libretro (main thread/WebView)
+│   │   ├── js/adapter.js           # PspAdapter: integra Emscripten ao contrato do Emmu
+│   │   └── vendor/ppsspp-ejs/      # PPSSPP libretro + assets (GPL-2.0, não editar)
 │   ├── emmu-mesen-sys/             # FFI da ABI do MesenCE + runtime SDL2/BIOS
 │   ├── emmu-super-sabicom/         # core SNES upstream (MIT)
 │   └── tetanes-core/               # core NES upstream (MIT OR Apache-2.0)
@@ -281,7 +291,7 @@ Saída: `platforms/web/ui/dist`.
 
 ### 4. Desktop
 
-Antes do build desktop, prepare o runtime MesenCE + SDL2 e os assets do N64Wasm. O comando único (recomendado) faz tudo e é o usado por `npm run desktop:build`:
+Antes do build desktop, prepare o runtime MesenCE + SDL2 e os assets do N64Wasm e do PPSSPP. O comando único (recomendado) faz tudo e é o usado por `npm run desktop:build`:
 
 ```sh
 bash platforms/desktop/scripts/prepare-bundle.sh
@@ -312,7 +322,7 @@ O script:
 4. ajusta rpath (`@loader_path` no macOS, `$ORIGIN` no Linux);
 5. copia a licença do SDL2.
 
-O `prepare-bundle.sh` chama esse script quando necessário e completa o pacote com `n64wasm.js`, `n64wasm.wasm`, `assets.zip` e os avisos de licença de terceiros. Falha com mensagem clara se faltar alguma dependência.
+O `prepare-bundle.sh` chama esse script quando necessário e completa o pacote com `n64wasm.js`, `n64wasm.wasm`, `assets.zip` (N64), `ppsspp_libretro.js`, `ppsspp_libretro.wasm`, `ppsspp-assets.zip` (PSP) e os avisos de licença de terceiros. Falha com mensagem clara se faltar alguma dependência.
 
 Depois:
 
@@ -339,11 +349,12 @@ No macOS, o instalador aparece em `target/release/bundle/dmg/Emmu_0.2.0_aarch64.
 | `MesenCore.dylib` / `.so` | todos os consoles Mesen | `bundle.resources` → `Contents/Resources/` |
 | `libSDL2-2.0.0.dylib` / `libSDL2-2.0.so.0` | áudio do Mesen (`dlopen`) | `bundle.resources` + rpath `@loader_path`/`$ORIGIN` |
 | `n64wasm.js`, `n64wasm.wasm`, `assets.zip` | N64 no WebView | embutidos em `dist/wasm/n64/` **e** declarados em `bundle.resources` |
+| `ppsspp_libretro.js`, `ppsspp_libretro.wasm`, `ppsspp-assets.zip` | PSP no WebView | embutidos em `dist/wasm/psp/` **e** declarados em `bundle.resources` |
 | BIOS GBA | GBA no Mesen | `include_bytes!` no executável, gravada em `<home>/Firmware/` |
-| Textos de licença | SDL2, Mesen (GPL-3 integral), N64Wasm, Web-GBA, dust, BIOS | `runtime/LICENSE-*.txt` + `THIRD-PARTY-NOTICES.txt` via `bundle.resources` |
-| 11 módulos WASM | navegador e N64/NDS desktop | embedados no executável como `frontendDist`; validados pelo `postbuild` |
+| Textos de licença | SDL2, Mesen (GPL-3 integral), N64Wasm, PPSSPP (GPL-2), Web-GBA, dust, BIOS | `runtime/LICENSE-*.txt` + `THIRD-PARTY-NOTICES.txt` via `bundle.resources` |
+| 11 módulos WASM + runtime PPSSPP | navegador e N64/NDS/PSP desktop | embedados no executável como `frontendDist`; validados pelo `postbuild` |
 
-O `postbuild` da UI (`scripts/check-bundle-assets.mjs`) falha o build se algum WASM ou asset N64 estiver ausente em `dist/`, evitando gerar um instalador incompleto. Detalhes em `crates/emmu-mesen-sys/BUNDLE.md`.
+O `postbuild` da UI (`scripts/check-bundle-assets.mjs`) falha o build se algum WASM ou asset N64/PSP estiver ausente em `dist/`, evitando gerar um instalador incompleto. Detalhes em `crates/emmu-mesen-sys/BUNDLE.md`.
 
 ### 5. Mobile (experimental)
 
@@ -379,7 +390,7 @@ cargo fmt --all -- --check
 cargo check --workspace
 
 # Testes dos núcleos e do desktop
-cargo test -p emmu-gg -p emmu-sms -p emmu-ws -p emmu-pce -p emmu-gb -p emmu-gbc -p emmu-n64 -p emmu-mesen-sys -p desktop
+cargo test -p emmu-gg -p emmu-sms -p emmu-ws -p emmu-pce -p emmu-gb -p emmu-gbc -p emmu-n64 -p emmu-nds -p emmu-psp -p emmu-mesen-sys -p desktop
 
 # Testes com ROM real (opcionais)
 EMMU_NES_TEST_ROM="/caminho/jogo.nes" cargo test -p emmu-nes
@@ -394,6 +405,8 @@ MESEN_PCE_TEST_ROM="/caminho/jogo.pce" cargo test -p emmu-mesen-sys
 MESEN_GG_TEST_ROM="/caminho/jogo.gg" cargo test -p emmu-mesen-sys
 MESEN_WS_TEST_ROM="/caminho/jogo.ws" cargo test -p emmu-mesen-sys
 ```
+
+O smoke test do PSP é feito pela UI: abrir `.iso`/`.cso`/`.pbp`/`.elf` e validar vídeo (WebGL2), áudio/volume, D-pad/analógico/botões, restart, save/load e histórico. O runtime PPSSPP precisa de isolamento cross-origin (COOP/COEP); o Vite e o Tauri já enviam os headers.
 
 `cargo test -p emmu-mesen-sys` e `-p desktop` exigem que `MesenCore` esteja linkável (runtime preparado ou `MESEN_LIB_DIR`).
 
@@ -421,6 +434,8 @@ cargo run -p emmu-snes --example snes_smoke -- Jogo.sfc
 | `crates/emmu-ws` | diretório local (ainda sem submódulo/remote) | core WonderSwan via Swanium | MIT |
 | `crates/emmu-pce` | `EspetoRx/emmu-pce` @ `e8a9860` | core PC Engine | GPL-3.0-only |
 | `crates/emmu-n64` | `EspetoRx/emmu-n64` @ `c066186` | core Nintendo 64 via N64Wasm | GPL-3.0-only (+ MIT no vendor) |
+| `crates/emmu-nds` | `EspetoRx/emmu-nds` @ `70d64fd` | core Nintendo DS via dust | GPL-3.0 |
+| `crates/emmu-psp` | `EspetoRx/emmu-psp` @ `49dd022` (commit local; remote vazio) | core PSP via PPSSPP libretro | GPL-3.0-or-later (+ GPL-2.0 no vendor) |
 | `crates/emmu-mesen-sys` | `EspetoRx/emmu-mesen-sys` @ `46dab68` | FFI Mesen + runtime | sem campo declarado |
 | `crates/emmu-super-sabicom` | `EspetoRx/emmu-super-sabicom` @ `a7b80ad` | core SNES | MIT |
 | `crates/tetanes-core` | `EspetoRx/tetanes-core` @ `e27c108` | core NES | MIT OR Apache-2.0 |
@@ -452,6 +467,8 @@ Este projeto combina código próprio e software de terceiros. Respeite cada lic
 | `emmu-pce` e JGenesis `pce-core` | GPL-3.0-only | `jsgroth/jgenesis`, commit `8d1bdfba...`; subset HuCard |
 | `emmu-n64` | GPL-3.0-only | código Emmu sob `LICENSE`; wrapper/fachada WASM para N64Wasm |
 | `emmu-nds` e dust | GPL-3.0 | `Kelpsyberry/dust` @ `76d79f2`; `emu-utils` e `arm-decoder` são dependências de build sem licença própria no upstream e seguem este trabalho GPL-3.0 |
+| `emmu-psp` | GPL-3.0-or-later | fachada/adaptador Emmu; `LICENSE` no crate |
+| PPSSPP libretro (EmulatorJS) | GPL-2.0-or-later | `@emulatorjs/core-ppsspp` 4.2.3 (RetroArch 1.21.0 + PPSSPP 2025-06-14); `Copyright (C) 2012-2025 PPSSPP Project / Dolphin Emulator Project`; avisos adicionais do PSPSDK; ver `crates/emmu-psp/UPSTREAM.txt` |
 | N64Wasm | MIT | `nbarkhina/N64Wasm` @ `3056c89d` (2024-11-12); `Copyright (c) 2021 Neil Barkhina`; mupen64plus + ParaLLEl-RDP compilados para WebAssembly |
 | Web-GBA / gbajs | BSD-2-Clause | `Copyright (c) 2012, Jeffrey Pfau`; adaptação web por `alexcerezo` |
 | MesenCE / Mesen 2 | GPL-3.0 | `Copyright (C) 2014-2025 Sour`; binário externo, distribuído via `runtime/` |
@@ -490,6 +507,9 @@ crates/emmu-pce/vendor/jgenesis/LICENSE
 crates/emmu-n64/LICENSE
 crates/emmu-n64/UPSTREAM.txt
 crates/emmu-n64/vendor/n64wasm/LICENSE
+crates/emmu-psp/LICENSE
+crates/emmu-psp/UPSTREAM.txt
+crates/emmu-psp/vendor/ppsspp-ejs/license.txt
 crates/emmu-super-sabicom/LICENSE
 crates/tetanes-core/LICENSE-MIT
 crates/tetanes-core/LICENSE-APACHE
@@ -499,7 +519,7 @@ crates/emmu-mesen-sys/vendor/SDL/LICENSE.txt
 crates/emmu-mesen-sys/runtime/LICENSE-SDL2.txt   # gerado pelo script
 ```
 
-> **Atenção:** os núcleos GB, GBC, GG e PCE são GPL-3.0; o MesenCE também é GPLv3. Um bundle desktop que inclui Mesen e/ou um bundle web que inclui esses WASM modules precisa observar as obrigações da GPLv3, incluindo disponibilizar o código-fonte correspondente e manter os avisos de licença. Este documento é informativo, não uma opinião jurídica.
+> **Atenção:** os núcleos GB, GBC, GG e PCE são GPL-3.0; o MesenCE também é GPLv3. O runtime PPSSPP do PSP é GPL-2.0-or-later. Um bundle desktop que inclui Mesen e/ou um bundle web que inclui esses WASM modules precisa observar as obrigações das respectivas GPLs, incluindo disponibilizar o código-fonte correspondente e manter os avisos de licença. Este documento é informativo, não uma opinião jurídica.
 
 ---
 
@@ -511,6 +531,7 @@ crates/emmu-mesen-sys/runtime/LICENSE-SDL2.txt   # gerado pelo script
 - O PC Engine implementa apenas HuCard; System Cards e jogos de CD-ROM não são suportados.
 - O Nintendo 64 usa o mesmo WASM no web e no desktop. O backend Mesen rejeita `N64` explicitamente. O save state é um gzip gerado pelo core; o histórico é mantido pelo Emmu.
 - O Nintendo DS usa o mesmo WASM no web e no desktop. O backend Mesen rejeita `NDS` explicitamente. O core `dust` usa BIOS HLE e firmware gerado em runtime, sem distribuir arquivos de sistema proprietários.
+- O PSP usa o mesmo runtime PPSSPP no web e no desktop, na main thread do WebView. O backend Mesen rejeita `PSP` explicitamente. O PPSSPP depende de assets de sistema (fontes, shaders, tabelas VFPU) do projeto PPSSPP, distribuídos sob GPL-2.0 em `ppsspp-assets.zip`; nenhuma BIOS ou firmware proprietário de PSP é incluído.
 - Nomes de consoles e jogos pertencem aos respectivos proprietários.
 
 ---
@@ -538,6 +559,10 @@ crates/emmu-mesen-sys/runtime/LICENSE-SDL2.txt   # gerado pelo script
 | NDS abre com erro “não suportado pelo backend Mesen” | console enviado ao Mesen | `createEmulator()` deve usar o worker WASM para NDS também sob Tauri |
 | Tela NDS achatada ou toque fora de lugar | `aspect-ratio` sem limite de largura | `.nds-canvas` deve manter `2 / 3` e limitar a largura pelo `max-height` |
 | Painel sensível NDS não responde | canvas sem eventos de ponteiro | confirme `set-touch`/`end-touch` no `Player.vue` e `setTouch`/`endTouch` no worker |
+| PSP abre tela preta ou não inicia | falta isolamento cross-origin / WebGL2 | confirme os headers COOP/COEP no Vite/Tauri e `crossOriginIsolated === true`; o PPSSPP roda na main thread |
+| PSP sem áudio ou áudio distorcido | fonte OpenAL/WebAudio não conectada | o volume atua em `Module.AL.currentCtx.sources[].gain.gain.value`; aba precisa estar em foco |
+| Save state PSP falha | envelope `EMMUPSP1` inválido ou gzip ausente | valide magic/versão/tamanhos e o estado gzipado em `/game.state` no MEMFS |
+| PSP com botões/analógico mortos | mapeamento RetroArch errado | `simulate_input` usa A=0, B=8, X=1, Y=9, Start=3, Select=2, D-pad=4..7, L/R=10/11, analógico=16..19 |
 
 ---
 
@@ -553,6 +578,6 @@ Agentes de IA e assistentes de código devem ler [`AGENTS.md`](AGENTS.md) antes 
 
 ## Versionamento
 
-O Emmu segue versionamento semântico. A versão atual da interface é `0.2.0`, registrada em `platforms/web/ui/package.json` e `package-lock.json`. O suporte a Nintendo 64 e Nintendo DS entra nesta versão.
+O Emmu segue versionamento semântico. A versão atual da interface é `0.2.0`, registrada em `platforms/web/ui/package.json` e `package-lock.json`. O suporte a Nintendo 64, Nintendo DS e PlayStation Portable entra nesta versão.
 
 Bons jogos — e lembre-se de preservar os créditos e as licenças de cada núcleo.

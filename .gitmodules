@@ -52,3 +52,6 @@
 [submodule "crates/emmu-nds"]
 	path = crates/emmu-nds
 	url = https://github.com/EspetoRx/emmu-nds.git
+[submodule "crates/emmu-psp"]
+	path = crates/emmu-psp
+	url = https://github.com/EspetoRx/emmu-psp.git
