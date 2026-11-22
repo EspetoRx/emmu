@@ -278,7 +278,13 @@ Saída: `platforms/web/ui/dist`.
 
 ### 4. Desktop
 
-Antes do build desktop, prepare o runtime MesenCE + SDL2:
+Antes do build desktop, prepare o runtime MesenCE + SDL2 e os assets do N64Wasm. O comando único (recomendado) faz tudo e é o usado por `npm run desktop:build`:
+
+```sh
+bash platforms/desktop/scripts/prepare-bundle.sh
+```
+
+Ou, para preparar apenas o runtime MesenCE + SDL2:
 
 ```sh
 # macOS — MESEN_LIB_DIR opcional; padrão: /tmp/MesenCE/InteropDLL/obj.osx-arm64
@@ -303,6 +309,8 @@ O script:
 4. ajusta rpath (`@loader_path` no macOS, `$ORIGIN` no Linux);
 5. copia a licença do SDL2.
 
+O `prepare-bundle.sh` chama esse script quando necessário e completa o pacote com `n64wasm.js`, `n64wasm.wasm`, `assets.zip` e os avisos de licença de terceiros. Falha com mensagem clara se faltar alguma dependência.
+
 Depois:
 
 ```sh
@@ -319,7 +327,20 @@ npm run desktop:dev
 npm run desktop:build
 ```
 
-No macOS, o instalador aparece em `target/release/bundle/dmg/Emmu_0.1.0_aarch64.dmg` e o app em `target/release/bundle/macos/Emmu.app`.
+No macOS, o instalador aparece em `target/release/bundle/dmg/Emmu_0.2.0_aarch64.dmg` e o app em `target/release/bundle/macos/Emmu.app`.
+
+### Dependências incluídas no instalador
+
+| Dependência | Uso | Como vai no pacote |
+| --- | --- | --- |
+| `MesenCore.dylib` / `.so` | todos os consoles Mesen | `bundle.resources` → `Contents/Resources/` |
+| `libSDL2-2.0.0.dylib` / `libSDL2-2.0.so.0` | áudio do Mesen (`dlopen`) | `bundle.resources` + rpath `@loader_path`/`$ORIGIN` |
+| `n64wasm.js`, `n64wasm.wasm`, `assets.zip` | N64 no WebView | embutidos em `dist/wasm/n64/` **e** declarados em `bundle.resources` |
+| BIOS GBA | GBA no Mesen | `include_bytes!` no executável, gravada em `<home>/Firmware/` |
+| Textos de licença | SDL2, Mesen (GPL-3 integral), N64Wasm, Web-GBA, BIOS | `runtime/LICENSE-*.txt` + `THIRD-PARTY-NOTICES.txt` via `bundle.resources` |
+| 10 módulos WASM | navegador e N64 desktop | embedados no executável como `frontendDist`; validados pelo `postbuild` |
+
+O `postbuild` da UI (`scripts/check-bundle-assets.mjs`) falha o build se algum WASM ou asset N64 estiver ausente em `dist/`, evitando gerar um instalador incompleto. Detalhes em `crates/emmu-mesen-sys/BUNDLE.md`.
 
 ### 5. Mobile (experimental)
 

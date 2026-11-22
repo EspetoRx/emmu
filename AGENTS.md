@@ -75,6 +75,8 @@ Para entender o projeto rapidamente, nesta ordem:
 | Build WASM desatualizado | `platforms/web/ui/package.json` (`build:wasm`) | diretório `src/wasm/` |
 | Erro de link Mesen | `crates/emmu-mesen-sys/build.rs` | `scripts/build-sdl2.sh` |
 | Gitlink sujo | submódulo específico | repositório principal |
+| Instalador sem SDL2/Mesen/N64Wasm | `resources` ou runtime não preparado | `platforms/desktop/scripts/prepare-bundle.sh` + `tauri.conf.json` (`bundle.resources`) |
+| Instalador com core faltando | `dist/` incompleto | `platforms/web/ui/scripts/check-bundle-assets.mjs` (`postbuild`) |
 | **N64 não inicia / tela preta / loop não arranca** | `crates/emmu-n64/js/bridge.js` (`cfgLines[39]`, `cfgLines[43]`) | `crates/emmu-n64/README.md` |
 | **N64 reinicia em 1/4 da tela** | `crates/emmu-n64/js/bridge.js` (`_neil_reset`) | `snes.worker.js` (`case "restart"` N64) |
 | **N64 com altura/tamanho errado no desktop** | `platforms/web/ui/src/style.css` (`.n64-canvas`, `aspect-ratio: 4/3`) | `crates/emmu-n64/src/wasm.rs` (`width`/`height`) |
@@ -555,6 +557,7 @@ Se pedirem para adicionar outro sistema, não comece pelo worker. Siga esta chec
 - Não edite diretamente `js/bridge.js` do GBA, `dist/`, `runtime/`, `runtime-link/`, `src/wasm/` ou `public/wasm/`.
 - `runtime/` e `runtime-link/` são gerados e ignorados.
 - `src/wasm/` é gerado e ignorado; `dist/` é saída de build. `public/wasm/n64/` contém assets copiados do vendor do core.
+- `platforms/desktop/scripts/prepare-bundle.sh` prepara MesenCore, SDL2, assets N64 e licenças; `bundle.resources` os envia no instalador.
 - `crates/emmu-ws` ainda é um diretório normal no repositório principal (sem remote/submódulo).
 - `crates/emmu-n64/vendor/n64wasm`, `crates/emmu-pce/vendor/jgenesis`, `crates/emmu-gg/vendor/jgenesis`, `crates/emmu-sms/vendor/jgenesis` e `crates/emmu-ws/vendor/swanian-core` **não** são submódulos: são códigos vendorizados dentro dos respectivos cores.
 - `crates/emmu-gba/vendor/web-gba-emulator` e `crates/emmu-mesen-sys/vendor/SDL` são submódulos de terceiros; evite commits locais neles.
