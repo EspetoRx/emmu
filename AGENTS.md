@@ -574,10 +574,11 @@ Se pedirem para adicionar outro sistema, não comece pelo worker. Siga esta chec
 
 ### Estado atual
 
-- `crates/emmu-gg` @ `c807bc1`, `crates/emmu-sms` @ `d55bd69`, `crates/emmu-n64` @ `c066186` são submódulos publicados.
+- `crates/emmu-gg` @ `c807bc1`, `crates/emmu-sms` @ `d55bd69`, `crates/emmu-n64` @ `c066186` e `crates/emmu-nds` @ `70d64fd` são submódulos publicados.
 - `crates/emmu-ws` foi adicionado como código local (Swanium MIT); decida o remote antes de transformá-lo em submodule.
-- A integração de UI/desktop do GG, SMS e N64 foi commitada nos submódulos correspondentes; os gitlinks são atualizados neste commit do repositório principal.
-- Não faça push no repositório principal sem confirmação explícita (a solicitação atual autoriza o push).
+- A integração de UI/desktop do GG, SMS, N64 e NDS foi commitada nos submódulos correspondentes; os gitlinks são atualizados neste commit do repositório principal.
+- O core NDS (`dust` GPL-3.0) roda como WASM no worker (web) e no WebView (desktop), com áudio nativo a 32768 Hz — não altere `AUDIO_SAMPLE_RATE`/`AUDIO_RATE`.
+- Não faça push no repositório principal sem confirmação explícita.
 
 ---
 
