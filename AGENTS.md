@@ -215,6 +215,7 @@ Não “corrija” essa diferença PCE sem verificar overscan e o consumidor do 
 ### 4.12 Persistência
 
 - IndexedDB: `emmu-library`, versão 2, stores `games` e `settings`.
+- ROMs, save states, miniaturas e histórico **devem** permanecer como `Blob` no registro. O IndexedDB serializa `ArrayBuffer` inline (limite de ~127 MiB no Chromium), mas guarda `Blob` por referência; converter ROM em `ArrayBuffer` no `saveLibraryGame`/`saveGameProgress` faz ROMs grandes (NDSi Enhanced de 256 MiB) falharem na importação e no autosave. Registros antigos com `ArrayBuffer` são curados no próximo checkpoint.
 - `MAX_SAVE_HISTORY = 10`.
 - `CHECKPOINT_INTERVAL = 5000` ms.
 - `MIN_LIBRARY_LOADING_MS = 450`.
