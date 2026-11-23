@@ -471,6 +471,7 @@ Worker.prototype.postMessage = function (msg, ...rest) {
 
 ### 7.10 PSP: tela preta, input morto ou save state falha
 
+0. No F5 do VS Code, confirme que a task `Emmu: cargo build desktop` usa `--no-default-features`. Com a feature padrão `custom-protocol`, o Tauri compila em modo produção, carrega `tauri://localhost` (sem COI) e o PSP aborta; o `devUrl` http com COOP/COEP só entra em modo dev.
 1. Confirme `crossOriginIsolated === true`, `typeof SharedArrayBuffer === "function"` e WebGL2 disponível. Sem COOP/COEP o Emscripten/pthreads não inicializa. Vite e Tauri já enviam os headers.
 2. Confirme que `createEmulator()` em `snes.js` retorna `PspClient` para `PSP` (nunca `EmulationWorkerClient`, nunca `MesenTauriClient`), e que `mesen_init_rom` rejeita `PSP`.
 3. O PPSSPP só gera frames com a aba visível/focada: se `get_current_frame_count` está em 0 e o canvas está preto, verifique o foco antes de suspeitar do core.
@@ -506,6 +507,7 @@ Worker.prototype.postMessage = function (msg, ...rest) {
 | Log N64 poluía o console | dezenas de `WebGL: INVALID_OPERATION` e logs de input | filtro `WebGL:` + logs `[debug-*]` comentados |
 | PSP com tela preta em aba em segundo plano | PPSSPP não gera frames sem foco/visibilidade | smoke test com aba focada; não “corrigir” o core |
 | PSP enviado ao Mesen | `createEmulator()` caiu no `MesenTauriClient` | `{ format: "PSP" } → PspClient` (main thread) |
+| F5 desktop com PSP abortando | `cargo build -p desktop` com `custom-protocol` carrega `tauri://localhost` | task de dev compila com `--no-default-features` e usa o `devUrl` http |
 | Autosave PSP falhava no primeiro frame | RetroArch ainda não registrou o caminho do save | retry de `cmd_save_state` por até 1,5 s no adaptador |
 | Load PSP aceitava estado inexistente | `load_state` retorna `0` também para caminho ausente | validar `/game.state` no MEMFS antes de carregar |
 | PSP com altura 270 | confusão com a resolução interna reportada | frame entregue é 480×272; não alinhar para 270 |

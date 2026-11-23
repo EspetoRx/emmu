@@ -46,11 +46,15 @@
     {
       "label": "Emmu: cargo build desktop",
       "type": "process",
+      // --no-default-features desliga `custom-protocol`. Com a feature ligada o
+      // Tauri trata o binário como produção e carrega tauri://localhost (sem
+      // crossOriginIsolated), em vez do devUrl http com COOP/COEP.
       "command": "cargo",
       "args": [
         "build",
         "-p",
-        "desktop"
+        "desktop",
+        "--no-default-features"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
