@@ -23,8 +23,35 @@
       }
     },
     {
+      "label": "Emmu: web dev server (PSP verbose)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.vscode/web-dev-server-verbose.sh",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "emmu-web-verbose",
+        "fileLocation": ["relative", "${workspaceFolder}/platforms/web/ui"],
+        "pattern": {
+          "regexp": "^__EMMU_NO_PROBLEMS__:(\\d+):(\\d+): (.*)$",
+          "line": 1,
+          "column": 2,
+          "message": 3
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^(> emmu-ui@.* dev|VITE v|Emmu: reiniciando Vite)",
+          "endsPattern": "(Local:.*127\\.0\\.0\\.1:5173|Emmu: servidor web já ativo)"
+        }
+      }
+    },
+    {
       "label": "Emmu: desktop prelaunch",
       "dependsOn": ["Emmu: web dev server", "Emmu: cargo build desktop"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Emmu: desktop prelaunch (PSP verbose)",
+      "dependsOn": ["Emmu: web dev server (PSP verbose)", "Emmu: cargo build desktop"],
       "dependsOrder": "parallel",
       "problemMatcher": []
     },

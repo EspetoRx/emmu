@@ -12,6 +12,30 @@
       "preLaunchTask": "Emmu: web dev server"
     },
     {
+      "name": "Emmu: Web (Chrome) — PSP verbose",
+      "type": "chrome",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/.vscode/chrome-for-testing.sh",
+      "url": "http://127.0.0.1:5173/?pspDebug=1",
+      "webRoot": "${workspaceFolder}/platforms/web/ui",
+      "preLaunchTask": "Emmu: web dev server"
+    },
+    {
+      "name": "Emmu: Desktop (Rust) — PSP verbose",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/target/debug/desktop",
+      "args": [],
+      "cwd": "${workspaceFolder}/platforms/desktop",
+      "env": {
+        "RUST_BACKTRACE": "1",
+        "RUST_LOG": "info",
+        "DYLD_LIBRARY_PATH": "${workspaceFolder}/crates/emmu-mesen-sys/runtime"
+      },
+      "preRunCommands": ["breakpoint name configure --disable cpp_exception"],
+      "preLaunchTask": "Emmu: desktop prelaunch (PSP verbose)"
+    },
+    {
       "name": "Emmu: Desktop (Rust)",
       "type": "lldb",
       "request": "launch",
