@@ -474,11 +474,12 @@ Worker.prototype.postMessage = function (msg, ...rest) {
 1. Confirme `crossOriginIsolated === true`, `typeof SharedArrayBuffer === "function"` e WebGL2 disponível. Sem COOP/COEP o Emscripten/pthreads não inicializa. Vite e Tauri já enviam os headers.
 2. Confirme que `createEmulator()` em `snes.js` retorna `PspClient` para `PSP` (nunca `EmulationWorkerClient`, nunca `MesenTauriClient`), e que `mesen_init_rom` rejeita `PSP`.
 3. O PPSSPP só gera frames com a aba visível/focada: se `get_current_frame_count` está em 0 e o canvas está preto, verifique o foco antes de suspeitar do core.
-4. `runFrame()` faz `readPixels` do WebGL2 para RGBA8888 480×272. Se o frame estiver preto mas `frameCount` subir, confira o `preserveDrawingBuffer: true` no patch de `canvas.getContext` do adaptador.
-5. Para input, instrumente `simulate_input` e confirme o par `(botão, pressionado)` com o mapa da seção 4.13. Analógico são quatro botões (16..19), valor central `0x7fff`.
-6. Para save, inspecione `/game.state` no MEMFS: `save_state_info` devolve `"<size>|<ptr>|1"`. Se o autosave do primeiro frame falhar, confirme o retry de `cmd_save_state` (1,5 s). No load, valide magic/versão/tamanhos antes de chamar `load_state("game.state", 0)` — o retorno `0` não indica sucesso.
-7. Para áudio, confirme `Module.AL.currentCtx.sources[].gain.gain.value` após `setVolume()`. Se não houver fontes, a aba pode estar sem foco ou o core ainda não iniciou o áudio.
-8. **Remova toda instrumentação antes de entregar.** Use `globalThis.__emmuPspVerboseLogs = true` para logs do core, nunca `console.log` fixo no adaptador.
+4. `runFrame()` faz `readPixels` do WebGL2 para RGBA8888 480×272. Se o frame estiver preto mas `frameCount` subir, confira o `preserveDrawingBuffer: true` no patch de `canvas.getContext` do adaptador **e o CSS do canvas interno**: ele precisa estar fixado em `480 / devicePixelRatio × 272 / devicePixelRatio`. Sem CSS, o `ResizeObserver` do core dobra o backing store a cada frame (960→1920→…→62 mil px) e o `readPixels` lê preto; com `100%` do host o texto fica degradado pela dupla reamostragem.
+5. Se o jogo “engasgar” com `frameCount` subindo, verifique se `capturePixels()` está reaproveitando `rawBuffer`/`flippedPixels`. Alocar ~0,5 MB por frame gera GC constante. Também confirme que a inicialização não ficou com a instrumentação de 5 s de `pulse`.
+6. Para input, instrumente `simulate_input` e confirme o par `(botão, pressionado)` com o mapa da seção 4.13. Analógico são quatro botões (16..19), valor central `0x7fff`.
+7. Para save, inspecione `/game.state` no MEMFS: `save_state_info` devolve `"<size>|<ptr>|1"`. Se o autosave do primeiro frame falhar, confirme o retry de `cmd_save_state` (1,5 s). No load, valide magic/versão/tamanhos antes de chamar `load_state("game.state", 0)` — o retorno `0` não indica sucesso.
+8. Para áudio, confirme `Module.AL.currentCtx.sources[].gain.gain.value` após `setVolume()`. Se não houver fontes, a aba pode estar sem foco ou o core ainda não iniciou o áudio.
+9. **Remova toda instrumentação antes de entregar.** Use `globalThis.__emmuPspVerboseLogs = true` para logs do core, nunca `console.log` fixo no adaptador.
 
 ---
 
@@ -508,6 +509,8 @@ Worker.prototype.postMessage = function (msg, ...rest) {
 | Autosave PSP falhava no primeiro frame | RetroArch ainda não registrou o caminho do save | retry de `cmd_save_state` por até 1,5 s no adaptador |
 | Load PSP aceitava estado inexistente | `load_state` retorna `0` também para caminho ausente | validar `/game.state` no MEMFS antes de carregar |
 | PSP com altura 270 | confusão com a resolução interna reportada | frame entregue é 480×272; não alinhar para 270 |
+| PSP tela preta com `frameCount` subindo | `ResizeObserver` do core dobrava o canvas (DPR 2) até 62 mil px | CSS do canvas interno fixo em `480/dpr × 272/dpr` + `readPixels` |
+| PSP com solavancos apesar de 60 fps | ~0,5 MB alocados por frame na captura | buffers raw/invertido reaproveitados no adaptador |
 
 ---
 

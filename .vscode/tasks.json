@@ -23,6 +23,12 @@
       }
     },
     {
+      "label": "Emmu: desktop prelaunch",
+      "dependsOn": ["Emmu: web dev server", "Emmu: cargo build desktop"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
       "label": "Emmu: build UI",
       "type": "process",
       "command": "npm",

@@ -26,7 +26,7 @@
       // O AudioToolbox (SDL) lança exceções C++ internas ao trocar o device de
       // áudio. O CodeLLDB persiste "C++: on throw" entre sessões e pausa nelas.
       "preRunCommands": ["breakpoint name configure --disable cpp_exception"],
-      "preLaunchTask": "Emmu: cargo build desktop"
+      "preLaunchTask": "Emmu: desktop prelaunch"
     }
   ]
 }
